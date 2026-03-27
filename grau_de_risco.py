@@ -16,28 +16,27 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* 1. Esconde os botões de Fork, GitHub e Menu padrão */
+    /* 1. Esconde botões de Fork, GitHub e Menu */
     .stAppDeployButton {display:none;}
     #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
+    header {background: rgba(0,0,0,0);} /* Deixa o fundo transparente em vez de sumir com tudo */
 
-    /* 2. FORÇA O BOTÃO DA SIDEBAR A FICAR VISÍVEL */
-    /* Mesmo com o header escondido, este comando "traz de volta" a setinha */
-    section[data-testid="stSidebar"] + div {
-        visibility: visible !important;
-        background-color: #1E3A8A !important;
-        border-radius: 0 5px 5px 0 !important;
-    }
-    
-    [data-testid="stSidebarCollapseButton"] {
+    /* 2. FORÇA A SETINHA DA SIDEBAR A APARECER */
+    button[data-testid="stSidebarCollapseButton"] {
         visibility: visible !important;
         color: white !important;
+        background-color: #1E3A8A !important; /* Azul para destacar */
+        border-radius: 5px !important;
+        top: 10px !important;
+        left: 10px !important;
+        position: fixed !important;
+        z-index: 9999999 !important;
     }
 
     /* 3. Ajuste de Espaçamento no Topo */
     .block-container {
-        padding-top: 0rem;
-        margin-top: -50px;
+        padding-top: 1rem;
+        margin-top: -40px;
     }
     </style>
     """,
