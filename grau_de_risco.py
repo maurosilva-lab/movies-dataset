@@ -4,11 +4,11 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA (DEVE SER A PRIMEIRA LINHA)
+# 1. CONFIGURAÇÃO DA PÁGINA
 # ==========================================
 st.set_page_config(layout="wide", page_title="Dashboard Risco Logística", page_icon="🚛")
 
-# CSS para Segurança e Layout
+# CSS para Segurança e Ajuste de Posição do Gráfico
 st.markdown(
     """
     <style>
@@ -36,6 +36,11 @@ st.markdown(
         font-weight: bold; 
         font-size: 22px; 
     }
+
+    /* TRUQUE CSS: Puxa o gráfico de Gauge para cima para alinhar com as métricas */
+    iframe[title="plotly.graph_objects.Figure"] {
+        margin-top: -25px;
+    }
     </style>
     <div class="header-bar">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>
     """,
@@ -43,7 +48,7 @@ st.markdown(
 )
 
 # ==========================================
-# 2. FUNÇÃO DE CARREGAMENTO DE DADOS
+# 2. CARREGAMENTO DE DADOS
 # ==========================================
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1dSYbGC3dFW2TP01ICfWY55P9OiurB0ngLsmrqM5kSYg/export?format=csv&gid=629990986"
 
@@ -91,7 +96,7 @@ with st.sidebar:
         st.stop()
 
 # ==========================================
-# 4. CONTEÚDO VISUAL (RENDERIZAÇÃO)
+# 4. CONTEÚDO VISUAL
 # ==========================================
 @st.fragment(run_every=600)
 def render_dashboard(df_all, date_val, cds_val):
@@ -105,8 +110,7 @@ def render_dashboard(df_all, date_val, cds_val):
     df_at = df_all[(df_all['DATA'] == date_val) & (df_all[col_cd].isin(cds_val))].copy()
     df_ps = df_all[(df_all['DATA'] == date_ant) & (df_all[col_cd].isin(cds_val))].copy()
 
-    # --- KPIs EM COLUNAS OTIMIZADAS ---
-    # c1: Gauge Largo | c2: DIF | c3: Malha Estreita | c4: DVG Atual
+    # --- KPIs ---
     c1, c2, c3, c4 = st.columns([1.8, 1.2, 0.7, 1.2])
 
     with c1:
@@ -126,9 +130,10 @@ def render_dashboard(df_all, date_val, cds_val):
                 ]
             }
         ))
+        # Margem "t" agora é 0 (mínimo permitido) para evitar o ValueError
         fig_gauge.update_layout(
             height=110, 
-            margin=dict(l=10, r=10, t=-10, b=0), 
+            margin=dict(l=10, r=10, t=0, b=0), 
             paper_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
@@ -137,12 +142,7 @@ def render_dashboard(df_all, date_val, cds_val):
         dvg_hoje = df_at[col_dvg].sum()
         dvg_ontem = df_ps[col_dvg].sum()
         dif_valor = dvg_hoje - dvg_ontem
-        st.metric(
-            label="DIF vs Anterior", 
-            value=f"{dif_valor/1000:+.1f}k", 
-            delta=f"{dif_valor/1000:,.1f}k", 
-            delta_color="inverse"
-        )
+        st.metric(label="DIF vs Anterior", value=f"{dif_valor/1000:+.1f}k", delta=f"{dif_valor/1000:,.1f}k", delta_color="inverse")
 
     with c3:
         qtd_malha = int(df_at[col_malha].sum())
@@ -170,20 +170,9 @@ def render_dashboard(df_all, date_val, cds_val):
     df_table = df_at[[col_cd, 'CIDADE', col_rectec, col_malha, col_dvg, col_risco]].copy()
 
     def style_performance(styler):
-        styler.format({
-            col_dvg: 'R$ {:,.1f}k', 
-            col_risco: '{:.2f}', 
-            col_malha: '{:,.0f}', 
-            col_rectec: 'R$ {:,.0f}k'
-        })
+        styler.format({col_dvg: 'R$ {:,.1f}k', col_risco: '{:.2f}', col_malha: '{:,.0f}', col_rectec: 'R$ {:,.0f}k'})
         styler.background_gradient(cmap='RdYlGn_r', subset=[col_dvg])
         styler.background_gradient(cmap='YlOrRd', subset=[col_risco], vmin=0, vmax=3)
-        
-        def color_contrast(val):
-            if isinstance(val, (int, float)) and val < 1.5: return 'color: black; font-weight: bold;'
-            return 'color: white; font-weight: bold;'
-        
-        styler.map(color_contrast, subset=[col_risco])
         styler.set_properties(**{'text-align': 'center', 'border': '1px solid #262730'})
         return styler
 
