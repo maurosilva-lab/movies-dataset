@@ -106,11 +106,10 @@ def render_dashboard(df_all, date_val, cds_val):
 
 
     with c1:
-    # Reduzi o height para 90 e tirei as margens para ele não "vazar"
-     risco_med = df_at[col_risco].mean()
-    fig_gauge = go.Figure(go.Indicator(
-        mode = "gauge+number", value = risco_med,
-        number = {'font': {'color': 'white', 'size': 24}, 'valueformat': '.2f'},
+    # Usamos uma altura fixa no gráfico (height=110) e limpamos margens
+     fig_gauge = go.Figure(go.Indicator(
+        mode = "gauge+number", value = df_at[col_risco].mean(),
+        number = {'font': {'color': 'white', 'size': 26}, 'valueformat': '.2f'},
         title = {'text': "Risco Médio", 'font': {'color': '#94A3B8', 'size': 12}},
         gauge = {'axis': {'range': [0, 3]}, 'bar': {'color': "#3B82F6"},
                  'steps': [
@@ -119,10 +118,9 @@ def render_dashboard(df_all, date_val, cds_val):
                      {'range': [2, 3], 'color': "red"}
                  ]}
     ))
-    # Ajuste crucial: height menor (90) e margens zeradas no topo (t=0)
-    fig_gauge.update_layout(height=90, margin=dict(l=10, r=10, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)')
+    # Crucial: t=10 (top) e b=0 (bottom) para alinhar com o topo dos outros cards
+    fig_gauge.update_layout(height=110, margin=dict(l=10, r=10, t=10, b=0), paper_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
-
     
     with c2:
         dvg_hoje = df_at[col_dvg].sum()
