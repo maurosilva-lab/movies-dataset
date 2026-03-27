@@ -2,14 +2,24 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-import streamlit as st
 
-# Remove a barra superior (ícones GitHub, Fork e Menu)
+# Configura a página e remove o espaço em branco do topo
+st.set_page_config(layout="wide")
+
 st.markdown(
     """
     <style>
-    header {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stAppDeployButton {display:none;}
+    
+    /* Remove o espaço em branco no topo do dashboard */
+    .block-container {
+        padding-top: 0rem;
+        padding-bottom: 0rem;
+        margin-top: -30px;
+    }
     </style>
     """,
     unsafe_allow_html=True
