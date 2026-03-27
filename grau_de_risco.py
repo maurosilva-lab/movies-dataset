@@ -13,45 +13,36 @@ st.set_page_config(
     initial_sidebar_state="expanded"  # Isso força os filtros a aparecerem abertos
 )
 
-# CSS para Segurança e Ajuste de Posição do Gráfico
 st.markdown(
     """
     <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    /* 1. Esconde os botões de Fork, GitHub e Menu padrão */
     .stAppDeployButton {display:none;}
-    
-    /* Ajuste de Espaçamento no Topo */
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        margin-top: -30px;
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* 2. FORÇA O BOTÃO DA SIDEBAR A FICAR VISÍVEL */
+    /* Mesmo com o header escondido, este comando "traz de volta" a setinha */
+    section[data-testid="stSidebar"] + div {
+        visibility: visible !important;
+        background-color: #1E3A8A !important;
+        border-radius: 0 5px 5px 0 !important;
     }
     
-    /* Estilização dos Cards e Header */
-    .stMetric { background-color: #111827; border-radius: 10px; padding: 15px; border: 1px solid #374151; }
-    .header-bar { 
-        background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%); 
-        padding: 15px; 
-        border-radius: 8px; 
-        color: white; 
-        margin-bottom: 25px; 
-        text-align: center; 
-        font-weight: bold; 
-        font-size: 22px; 
+    [data-testid="stSidebarCollapseButton"] {
+        visibility: visible !important;
+        color: white !important;
     }
 
-    /* TRUQUE CSS: Puxa o gráfico de Gauge para cima para alinhar com as métricas */
-    iframe[title="plotly.graph_objects.Figure"] {
-        margin-top: -25px;
+    /* 3. Ajuste de Espaçamento no Topo */
+    .block-container {
+        padding-top: 0rem;
+        margin-top: -50px;
     }
     </style>
-    <div class="header-bar">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>
     """,
     unsafe_allow_html=True
 )
-
 # ==========================================
 # 2. CARREGAMENTO DE DADOS
 # ==========================================
