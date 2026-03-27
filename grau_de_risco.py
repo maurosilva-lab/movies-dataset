@@ -17,37 +17,49 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* 1. Esconde o lixo visual padrão */
+    /* 1. Limpeza do Header e Menu */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .stAppDeployButton {display:none;} 
 
-    /* 2. FORÇA O BOTÃO DE ABRIR SIDEBAR A APARECER (MESMO SEM HEADER) */
+    /* 2. BOTÃO DE FILTROS SEMPRE VISÍVEL (AZUL) */
     button[data-testid="stSidebarCollapseButton"] {
         visibility: visible !important;
         position: fixed !important;
         top: 15px !important;
         left: 10px !important;
         z-index: 99999 !important;
-        background-color: #1e3a8a !important; /* Azul para você enxergar */
+        background-color: #1e3a8a !important;
         color: white !important;
         border-radius: 50% !important;
         width: 40px !important;
         height: 40px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.3) !important;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.5) !important;
     }
 
-    /* 3. Ajuste de Espaçamento no Topo */
+    /* 3. AJUSTE DO CONTEÚDO (PARA O TÍTULO APARECER) */
     .block-container {
-        padding-top: 2rem;
-        margin-top: -30px;
+        padding-top: 3rem !important; /* Aumentei o espaço no topo */
+        margin-top: -20px;
     }
 
-    /* 4. Estilo Profissional dos Cards */
+    /* 4. TÍTULO BLINDADO (Z-INDEX ALTO) */
+    .dashboard-title {
+        background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%);
+        padding: 15px;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+        font-weight: bold;
+        font-size: 24px;
+        margin-bottom: 30px;
+        position: relative;
+        z-index: 1000; /* Garante que fique na frente de tudo */
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    /* 5. CARDS DOS KPIs */
     [data-testid="stMetric"] {
         background-color: #111827 !important;
         border-radius: 15px !important;
@@ -55,10 +67,10 @@ st.markdown(
         border: 1px solid #374151 !important;
     }
     </style>
+    <div class="dashboard-title">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>
     """,
     unsafe_allow_html=True
 )
-
 # ==========================================
 # 2. CARREGAMENTO DE DADOS
 # ==========================================
