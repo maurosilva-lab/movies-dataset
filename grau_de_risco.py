@@ -70,30 +70,41 @@ def load_data():
 df_raw = load_data()
 
 # ==========================================
-# 3. SIDEBAR E FILTROS
+# 3. SIDEBAR E FILTROS (MELHORADO)
 # ==========================================
 with st.sidebar:
     st.header("⚙️ Painel de Controle")
-    if st.button('🔄 Forçar Atualização de Dados'):
+    
+    # Botão de atualização sempre visível
+    if st.button('🔄 Atualizar Dados'):
         st.cache_data.clear()
         st.rerun()
+        
     st.write(f"Última leitura: {datetime.now().strftime('%H:%M:%S')}")
     st.divider()
 
-    if not df_raw.empty:
-        st.subheader("Filtros")
-        datas_todas = sorted(df_raw['DATA'].unique(), reverse=True)
-        sel_date = st.selectbox("Selecione a Data", options=datas_todas)
+    # Verificamos se o DataFrame tem dados antes de mostrar os filtros
+    if df_raw is not None and not df_raw.empty:
+        st.subheader("Filtros de Pesquisa")
         
-        col_tipo, col_cd = 'TIPO', 'CD'
+        # 1. Filtro de Data
+        datas_todas = sorted(df_raw['DATA'].unique(), reverse=True)
+        sel_date = st.selectbox("Selecione a Data", options=datas_todas, index=0)
+        
+        # 2. Filtro de Tipo (Unidade)
+        col_tipo = 'TIPO'
         tipos_disp = sorted(df_raw[col_tipo].unique()) if col_tipo in df_raw.columns else []
         sel_tipos = st.multiselect("Tipo de Unidade", options=tipos_disp, default=tipos_disp)
         
-        cds_disp = sorted(df_raw[df_raw[col_tipo].isin(sel_tipos)][col_cd].unique())
+        # 3. Filtro de CD (Filiais)
+        col_cd = 'CD'
+        # Filtra os CDs baseados nos tipos selecionados acima
+        cds_filtrados = df_raw[df_raw[col_tipo].isin(sel_tipos)][col_cd].unique()
+        cds_disp = sorted(cds_filtrados)
         sel_cds = st.multiselect("Filiais (CDs)", options=cds_disp, default=cds_disp)
     else:
-        st.error("Aguardando dados da planilha...")
-        st.stop()
+        st.warning("⚠️ Conectando à base de dados... Se demorar, verifique a permissão da planilha.")
+        st.stop() # Interrompe aqui se não houver dados
 
 # ==========================================
 # 4. CONTEÚDO VISUAL
