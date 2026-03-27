@@ -2,7 +2,18 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
+import streamlit as st
 
+# Remove a barra superior (ícones GitHub, Fork e Menu)
+st.markdown(
+    """
+    <style>
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA
 # ==========================================
