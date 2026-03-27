@@ -6,37 +6,47 @@ from datetime import datetime
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA
 # ==========================================
-st.set_page_config(
-    layout="wide", 
-    page_title="Dashboard Risco Logística", 
-    page_icon="🚛",
-    initial_sidebar_state="expanded"  # Isso força os filtros a aparecerem abertos
-)
+# Exibe o título estilizado
+st.markdown('<div class="dashboard-title">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>', unsafe_allow_html=True)
 
 st.markdown(
     """
     <style>
-    /* 1. Esconde botões de Fork, GitHub e Menu */
-    .stAppDeployButton {display:none;}
+    /* 1. Esconde botões do GitHub, Fork e Menu padrão */
     #MainMenu {visibility: hidden;}
-    header {background: rgba(0,0,0,0);} /* Deixa o fundo transparente em vez de sumir com tudo */
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stAppDeployButton {display:none;} 
 
-    /* 2. FORÇA A SETINHA DA SIDEBAR A APARECER */
-    button[data-testid="stSidebarCollapseButton"] {
-        visibility: visible !important;
-        color: white !important;
-        background-color: #1E3A8A !important; /* Azul para destacar */
-        border-radius: 5px !important;
-        top: 10px !important;
-        left: 10px !important;
-        position: fixed !important;
-        z-index: 9999999 !important;
+    /* 2. Garante que a barra lateral (filtros) funcione e tenha contraste */
+    [data-testid="stSidebar"] {
+        background-color: #111827;
     }
 
-    /* 3. Ajuste de Espaçamento no Topo */
+    /* 3. Ajuste de Espaçamento no Topo para o título não sumir */
     .block-container {
-        padding-top: 1rem;
-        margin-top: -40px;
+        padding-top: 0rem;
+        margin-top: -30px;
+    }
+
+    /* 4. Estilização das métricas (Cards pretos) */
+    .stMetric { 
+        background-color: #111827; 
+        border-radius: 10px; 
+        padding: 15px; 
+        border: 1px solid #374151; 
+    }
+
+    /* 5. Classe especial para o Título principal */
+    .dashboard-title {
+        background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%);
+        padding: 15px;
+        border-radius: 8px;
+        color: white;
+        text-align: center;
+        font-weight: bold;
+        font-size: 22px;
+        margin-bottom: 20px;
     }
     </style>
     """,
