@@ -4,12 +4,12 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA (Sempre a primeira)
+# 1. CONFIGURAÇÃO DA PÁGINA
 # ==========================================
 st.set_page_config(layout="wide", page_title="Dashboard Risco Logística", page_icon="🚛")
 
 # ==========================================
-# 2. FUNÇÃO DE CARREGAMENTO DE DADOS (COM CACHE)
+# 2. FUNÇÃO DE CARREGAMENTO DE DADOS
 # ==========================================
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1dSYbGC3dFW2TP01ICfWY55P9OiurB0ngLsmrqM5kSYg/export?format=csv&gid=629990986"
 
@@ -31,7 +31,7 @@ def load_data():
 df_raw = load_data()
 
 # ==========================================
-# 3. SIDEBAR (CONTROLES E FILTROS TOTAIS)
+# 3. SIDEBAR E FILTROS
 # ==========================================
 with st.sidebar:
     st.header("⚙️ Painel de Controle")
@@ -57,23 +57,20 @@ with st.sidebar:
         st.stop()
 
 # ==========================================
-# 4. CONTEÚDO VISUAL (DENTRO DO FRAGMENTO)
+# 4. CONTEÚDO VISUAL (FRAGMENTO)
 # ==========================================
-@st.fragment(run_every=600) # Auto-refresh a cada 10 minutos
+@st.fragment(run_every=600)
 def render_dashboard(df_all, date_val, cds_val):
-    # Lógica de comparação de datas
     datas_todas = sorted(df_all['DATA'].unique(), reverse=True)
     idx = datas_todas.index(date_val)
     date_ant = datas_todas[idx + 1] if idx + 1 < len(datas_todas) else date_val
 
-    # Filtragem Final
     col_dvg, col_risco, col_malha = 'DVG EM em Milhares', 'GRAU DE RISCO GERAL', 'MALHA EM QNT'
     col_rectec, col_cd = 'REC. TEC. em Milhares', 'CD'
     
     df_at = df_all[(df_all['DATA'] == date_val) & (df_all[col_cd].isin(cds_val))].copy()
     df_ps = df_all[(df_all['DATA'] == date_ant) & (df_all[col_cd].isin(cds_val))].copy()
 
-    # --- CSS Original ---
     st.markdown("""
         <style>
         .stMetric { background-color: #111827; border-radius: 10px; padding: 15px; border: 1px solid #374151; }
@@ -83,7 +80,7 @@ def render_dashboard(df_all, date_val, cds_val):
         <div class="header-bar">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>
     """, unsafe_allow_html=True)
 
-    # --- LINHA 1: Restauração dos KPIs Originais com Gauge ---
+    # --- KPIs ---
     c1, c2, c3, c4 = st.columns([1, 1, 1, 1.2])
 
     with c1:
@@ -96,13 +93,12 @@ def render_dashboard(df_all, date_val, cds_val):
         st.metric("DIF vs Anterior", f"{dif_valor/1000:+.1f}k", delta=f"{dif_valor/1000:,.1f}k", delta_color="inverse")
 
     with c3:
+        # MALHA COMO INTEIRO NO KPI
         st.metric("Qtd Malha", f"{int(df_at[col_malha].sum()):,}")
 
     with c4:
-        # RESTAURAÇÃO DO GAUGE (VELOCÍMETRO)
         st.markdown('<div class="gauge-card">', unsafe_allow_html=True)
         risco_med = df_at[col_risco].mean()
-        
         fig_gauge = go.Figure(go.Indicator(
             mode = "gauge+number", value = risco_med,
             number = {'font': {'color': 'white', 'size': 30}, 'valueformat': '.2f'},
@@ -116,33 +112,32 @@ def render_dashboard(df_all, date_val, cds_val):
 
     st.divider()
 
-    # --- LINHA 2: Gráfico de Pareto (DVG por CD) ---
+    # --- PARETO ---
     st.subheader("Concentração de DVG por Unidade")
     df_p = df_at[df_at[col_dvg] > 0].sort_values(col_dvg, ascending=False).reset_index(drop=True)
     if not df_p.empty:
         df_p['cum_perc'] = 100 * df_p[col_dvg].cumsum() / df_p[col_dvg].sum()
         fig_p = go.Figure()
-        # Barras de DVG
         fig_p.add_trace(go.Bar(x=df_p[col_cd].astype(str), y=df_p[col_dvg], name="DVG", marker_color='#3B82F6', text=[f"R$ {v/1000:.1f}k" for v in df_p[col_dvg]], textposition='outside'))
-        # Linha de % Acumulada
         fig_p.add_trace(go.Scatter(x=df_p[col_cd].astype(str), y=df_p['cum_perc'], name="%", yaxis="y2", line=dict(color="#F87171", width=3), mode='lines+markers'))
-        
-        fig_p.update_layout(height=380, template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', yaxis=dict(title="DVG (Milhões)"), yaxis2=dict(overlaying="y", side="right", range=[0, 110], showgrid=False), legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"), margin=dict(l=10, r=10, t=30, b=10))
+        fig_p.update_layout(height=380, template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', yaxis2=dict(overlaying="y", side="right", range=[0, 110], showgrid=False), legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"))
         st.plotly_chart(fig_p, use_container_width=True)
 
-    # --- LINHA 3: Tabela Estilizada Original ---
+    # --- TABELA DETALHADA ---
     st.subheader("📋 Detalhamento Operacional")
     df_table = df_at[[col_cd, 'CIDADE', col_rectec, col_malha, col_dvg, col_risco]].copy()
 
     def style_performance(styler):
-        # Formatação Numérica
-        styler.format({col_dvg: 'R$ {:,.1f}k', col_risco: '{:.2f}', col_malha: '{:,}'})
-        # Gradiente para DVG (Inverso: Vermelho alto, Verde baixo)
+        # FORMATAÇÃO AJUSTADA: REC. TEC. e MALHA como INTEIROS ({:,.0f})
+        styler.format({
+            col_dvg: 'R$ {:,.1f}k', 
+            col_risco: '{:.2f}', 
+            col_malha: '{:,.0f}', 
+            col_rectec: 'R$ {:,.0f}k'
+        })
         styler.background_gradient(cmap='RdYlGn_r', subset=[col_dvg])
-        # Gradiente para Risco (Amarelo/Vermelho)
         styler.background_gradient(cmap='YlOrRd', subset=[col_risco], vmin=0, vmax=3)
         
-        # Correção de contraste do texto no Risco
         def color_contrast(val):
             if isinstance(val, (int, float)) and val < 1.5: return 'color: black; font-weight: bold;'
             return 'color: white; font-weight: bold;'
