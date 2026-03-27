@@ -128,47 +128,43 @@ def render_dashboard(df_all, date_val, cds_val):
 
     # --- KPIs ---
     c1, c2, c3, c4 = st.columns([1.8, 1.2, 0.7, 1.2])
+# --- DEFINIÇÃO DE COLUNAS ---
+# O segredo está em [1.5, 1, 1, 1] para que c2, c3 e c4 fiquem IGUAIS
+c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
 
-    with c1:
-        risco_med_val = df_at[col_risco].mean()
-        fig_gauge = go.Figure(go.Indicator(
-            mode = "gauge+number", 
-            value = risco_med_val,
-            number = {'font': {'color': 'white', 'size': 26}, 'valueformat': '.2f'},
-            title = {'text': "Risco Médio", 'font': {'color': '#94A3B8', 'size': 12}},
-            gauge = {
-                'axis': {'range': [0, 3]}, 
-                'bar': {'color': "#3B82F6"},
-                'steps': [
-                    {'range': [0, 1], 'color': "green"}, 
-                    {'range': [1, 2], 'color': "yellow"}, 
-                    {'range': [2, 3], 'color': "red"}
-                ]
-            }
-        ))
-        # Margem "t" agora é 0 (mínimo permitido) para evitar o ValueError
-        fig_gauge.update_layout(
-            height=110, 
-            margin=dict(l=10, r=10, t=0, b=0), 
-            paper_bgcolor='rgba(0,0,0,0)'
-        )
-        st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
+with c1:
+    risco_med_val = df_at[col_risco].mean()
+    fig_gauge = go.Figure(go.Indicator(
+        mode = "gauge+number", 
+        value = risco_med_val,
+        number = {'font': {'color': 'white', 'size': 26}, 'valueformat': '.2f'},
+        title = {'text': "Risco Médio", 'font': {'color': '#94A3B8', 'size': 12}},
+        gauge = {
+            'axis': {'range': [0, 3]}, 
+            'bar': {'color': "#3B82F6"},
+            'steps': [
+                {'range': [0, 1], 'color': "green"}, 
+                {'range': [1, 2], 'color': "yellow"}, 
+                {'range': [2, 3], 'color': "red"}
+            ]
+        }
+    ))
+    fig_gauge.update_layout(height=110, margin=dict(l=10, r=10, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)')
+    st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
 
-    with c2:
-        dvg_hoje = df_at[col_dvg].sum()
-        dvg_ontem = df_ps[col_dvg].sum()
-        dif_valor = dvg_hoje - dvg_ontem
-        st.metric(label="DIF vs Anterior", value=f"{dif_valor/1000:+.1f}k", delta=f"{dif_valor/1000:,.1f}k", delta_color="inverse")
+with c2:
+    dvg_hoje = df_at[col_dvg].sum()
+    dvg_ontem = df_ps[col_dvg].sum()
+    dif_valor = dvg_hoje - dvg_ontem
+    st.metric(label="DIF vs Anterior", value=f"{dif_valor/1000:+.1f}k", delta=f"{dif_valor/1000:,.1f}k", delta_color="inverse")
 
-    with c3:
-        qtd_malha = int(df_at[col_malha].sum())
-        st.metric(label="Qtd Malha", value=f"{qtd_malha:,}")
+with c3:
+    qtd_malha = int(df_at[col_malha].sum())
+    st.metric(label="Qtd Malha", value=f"{qtd_malha:,}")
 
-    with c4:
-        dvg_total = df_at[col_dvg].sum()
-        st.metric(label="DVG Atual", value=f"R$ {dvg_total/1000:,.1f}k")
-
-    st.divider()
+with c4:
+    dvg_total = df_at[col_dvg].sum()
+    st.metric(label="DVG Atual", value=f"R$ {dvg_total/1000:,.1f}k")
 
     # --- GRÁFICO PARETO ---
     st.subheader("Concentração de DVG por Unidade")
