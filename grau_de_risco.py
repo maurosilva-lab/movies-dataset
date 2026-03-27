@@ -6,7 +6,12 @@ from datetime import datetime
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA
 # ==========================================
-st.set_page_config(layout="wide", page_title="Dashboard Risco Logística", page_icon="🚛")
+st.set_page_config(
+    layout="wide", 
+    page_title="Dashboard Risco Logística", 
+    page_icon="🚛",
+    initial_sidebar_state="expanded"  # Isso força os filtros a aparecerem abertos
+)
 
 # CSS para Segurança e Ajuste de Posição do Gráfico
 st.markdown(
