@@ -2,11 +2,22 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-# No topo do script, logo após o set_page_config
+
+# ==========================================
+# 1. CONFIGURAÇÃO DA PÁGINA (ESTRITAMENTE O PRIMEIRO)
+# ==========================================
+st.set_page_config(
+    layout="wide", 
+    page_title="Dashboard Risco Logística", 
+    page_icon="🚛",
+    initial_sidebar_state="expanded"
+)
+
+# Inicializa o estado da sidebar para evitar travamentos
 if 'sidebar_state' not in st.session_state:
     st.session_state.sidebar_state = 'expanded'
 
-# --- CSS DE SEGURANÇA MÁXIMA ---
+# --- CSS DE SEGURANÇA E TÍTULO ---
 st.markdown(
     """
     <style>
@@ -15,14 +26,17 @@ st.markdown(
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stAppDeployButton {display:none !important;}
+    [data-testid="stStatusWidget"] {display:none !important;}
 
     /* 2. AJUSTE DE LARGURA */
     .block-container {
         max-width: 98% !important;
         padding-top: 1rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
     }
 
-    /* 3. TÍTULO */
+    /* 3. TÍTULO ESTILIZADO */
     .dashboard-title {
         background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%);
         padding: 12px;
@@ -32,6 +46,14 @@ st.markdown(
         font-weight: bold;
         font-size: 22px;
         margin-bottom: 25px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+
+    /* 4. CARDS KPIs */
+    [data-testid="stMetric"] {
+        background-color: #111827 !important;
+        border: 1px solid #374151 !important;
+        border-radius: 10px !important;
     }
     </style>
     <div class="dashboard-title">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>
@@ -39,28 +61,11 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- BOTÃO DE EMERGÊNCIA VIA PYTHON ---
-# Se os filtros sumirem, este botão no topo da página vai ajudar
+# --- BOTÃO DE EMERGÊNCIA (Caso os filtros sumam ao clicar em <<) ---
 c_btn, _ = st.columns([0.1, 0.9])
 with c_btn:
-    if st.button("⚙️ Filtros"):
-        # Isso força o Streamlit a redesenhar a página
+    if st.button("⚙️ Abrir Filtros"):
         st.rerun()
-
-# ==========================================
-# 3. SIDEBAR E FILTROS
-# ==========================================
-with st.sidebar:
-    st.header("⚙️ Painel de Controle")
-    # Botão para "esconder" que não quebra o sistema
-    st.info("Use a seta '<<' no topo para recolher.")
-    
-    if st.button('🔄 Atualizar Dados'):
-        st.cache_data.clear()
-        st.rerun()
-    st.divider()
-    
-
 
 # ==========================================
 # 2. CARREGAMENTO DE DADOS
@@ -85,10 +90,12 @@ def load_data():
 df_raw = load_data()
 
 # ==========================================
-# 3. SIDEBAR E FILTROS
+# 3. SIDEBAR E FILTROS (UNIFICADO)
 # ==========================================
 with st.sidebar:
     st.header("⚙️ Painel de Controle")
+    st.info("Se os filtros sumirem, use o botão '⚙️ Abrir Filtros' no topo.")
+    
     if st.button('🔄 Atualizar Dados'):
         st.cache_data.clear()
         st.rerun()
@@ -124,7 +131,7 @@ def render_dashboard(df_all, date_val, cds_val):
     df_at = df_all[(df_all['DATA'] == date_val) & (df_all[col_cd].isin(cds_val))].copy()
     df_ps = df_all[(df_all['DATA'] == date_ant) & (df_all[col_cd].isin(cds_val))].copy()
 
-    # --- KPIs em Colunas Proporcionais ---
+    # --- KPIs ---
     c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
 
     with c1:
