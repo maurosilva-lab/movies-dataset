@@ -9,29 +9,39 @@ st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 st.markdown(
     """
     <style>
-    /* 1. FORÇA LARGURA TOTAL */
+    /* 1. CONFIGURAÇÃO DE LARGURA */
     .block-container {
         max-width: 98% !important;
         padding-top: 1rem !important;
-        padding-left: 2rem !important;
-        padding-right: 2rem !important;
+        padding-left: 3rem !important; /* Espaço para o botão de segurança */
     }
 
-    /* 2. GOLPE DE MISERICÓRDIA NO GITHUB E FERRAMENTAS */
-    /* Esconde a barra superior inteira */
+    /* 2. ESCONDE O HEADER E O GITHUB (SEGURANÇA) */
     [data-testid="stHeader"] {display: none !important;}
-    
-    /* Esconde especificamente o menu de ferramentas (onde fica o ícone do Git) */
-    .stAppToolbar {display: none !important;}
-    
-    /* Esconde o widget de status e deploy */
-    [data-testid="stStatusWidget"] {display: none !important;}
-    .stAppDeployButton {display: none !important;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stAppDeployButton {display:none !important;}
+    [data-testid="stStatusWidget"] {display:none !important;}
+    .stAppToolbar {display:none !important;}
 
-    /* Remove qualquer link que aponte para o GitHub */
-    a[href*="github.com"] {display: none !important;}
+    /* 3. BOTÃO DE EMERGÊNCIA (PARA OS FILTROS NÃO SUMIREM) */
+    /* Este código força o botão de "Abrir Sidebar" a ficar visível e azul */
+    button[data-testid="stSidebarCollapseButton"] {
+        visibility: visible !important;
+        display: block !important;
+        position: fixed !important;
+        top: 10px !important;
+        left: 10px !important;
+        z-index: 9999999 !important;
+        background-color: #1e3a8a !important; /* Azul Data Unit */
+        color: white !important;
+        border-radius: 50% !important;
+        width: 40px !important;
+        height: 40px !important;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.5) !important;
+    }
 
-    /* 3. TÍTULO ESTILIZADO */
+    /* 4. TÍTULO ESTILIZADO */
     .dashboard-title {
         background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%);
         padding: 12px;
@@ -41,19 +51,13 @@ st.markdown(
         font-weight: bold;
         font-size: 22px;
         margin-bottom: 25px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
 
-    /* 4. CARDS KPIs */
+    /* 5. CARDS KPIs */
     [data-testid="stMetric"] {
         background-color: #111827 !important;
         border: 1px solid #374151 !important;
         border-radius: 10px !important;
-    }
-    
-    /* 5. SIDEBAR (FILTROS) - Ajuste de cor para contraste */
-    [data-testid="stSidebar"] {
-        background-color: #111827 !important;
     }
     </style>
     <div class="dashboard-title">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>
