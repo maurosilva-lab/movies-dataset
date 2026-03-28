@@ -31,6 +31,7 @@ def check_password():
 if check_password():
 
    # --- CSS DE SEGURANÇA E BOTÃO FLUTUANTE ---
+    # --- CSS DE SEGURANÇA E ESTRUTURA ---
     st.markdown(
         """
         <style>
@@ -42,30 +43,15 @@ if check_password():
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
 
-        /* 2. BOTÃO DE FILTROS SEMPRE VISÍVEL (FLUTUANTE) */
-        /* Este código resgata a setinha do Streamlit e coloca ela num círculo azul */
-        button[data-testid="stSidebarCollapseButton"] {
-            visibility: visible !important;
-            display: block !important;
-            position: fixed !important;
-            top: 15px !important;
-            left: 15px !important;
-            z-index: 9999999 !important;
-            background-color: #1e3a8a !important; /* Azul da Data Unit */
-            color: white !important;
-            border-radius: 50% !important;
-            width: 45px !important;
-            height: 45px !important;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.5) !important;
-        }
-
-        /* 3. AJUSTE DE LARGURA E TÍTULO */
+        /* 2. FORÇA LARGURA TOTAL E AJUSTE DE MARGEM */
         .block-container {
             max-width: 98% !important;
             padding-top: 1rem !important;
-            padding-left: 4.5rem !important; /* Abre espaço para o botão não cobrir o Gauge */
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
         }
 
+        /* 3. TÍTULO ESTILIZADO */
         .dashboard-title {
             background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%);
             padding: 12px;
@@ -74,19 +60,35 @@ if check_password():
             text-align: center;
             font-weight: bold;
             font-size: 22px;
-            margin-bottom: 25px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
 
-        [data-testid="stMetric"] {
-            background-color: #111827 !important;
-            border: 1px solid #374151 !important;
-            border-radius: 10px !important;
+        /* 4. ESTILO DO BOTÃO DE FILTROS NATIVO */
+        div.stButton > button {
+            background-color: #1e3a8a !important;
+            color: white !important;
+            border-radius: 5px !important;
+            border: 1px solid #3b82f6 !important;
+            height: 3em !important;
+            width: 100% !important;
         }
         </style>
         <div class="dashboard-title">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>
         """,
         unsafe_allow_html=True
     )
+
+    # --- BOTÃO DE COMANDO DOS FILTROS ---
+    # Colocamos um botão real do Streamlit que força a abertura da sidebar
+    c_menu, _ = st.columns([0.2, 0.8])
+    with c_menu:
+        if st.button("⚙️ ABRIR / FECHAR PAINEL"):
+            if st.session_state.sidebar_state == 'collapsed':
+                st.session_state.sidebar_state = 'expanded'
+            else:
+                st.session_state.sidebar_state = 'collapsed'
+            st.rerun()
 
     # ==========================================
     # 2. CARREGAMENTO DE DADOS
