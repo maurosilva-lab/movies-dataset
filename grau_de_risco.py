@@ -6,13 +6,6 @@ from datetime import datetime
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (ESTADO INICIAL)
 # ==========================================
-st.set_page_config(
-    layout="wide", 
-    page_title="Dashboard Risco Logística", 
-    page_icon="🚛",
-    initial_sidebar_state="expanded"
-)
-
 st.markdown(
     """
     <style>
@@ -25,20 +18,20 @@ st.markdown(
     .stAppToolbar {display:none !important;}
     a[href*="github.com"] {display:none !important;}
     
-    /* 2. BOTÃO DE FILTROS FLUTUANTE (RECUPERAÇÃO) */
-    /* Este bloco força o botão de abrir a sidebar a ficar visível e clicável */
+    /* 2. RECUPERAÇÃO DO BOTÃO DE FILTROS (FORÇADO) */
+    /* Este código cria um botão azul flutuante no canto superior esquerdo */
     button[data-testid="stSidebarCollapseButton"] {
         visibility: visible !important;
         position: fixed !important;
-        top: 12px !important;
-        left: 12px !important;
-        z-index: 999999 !important;
-        background-color: #1e3a8a !important; /* Azul para combinar com o título */
+        top: 15px !important;
+        left: 15px !important;
+        z-index: 9999999 !important; /* Na frente de tudo mesmo! */
+        background-color: #1e3a8a !important; /* Azul igual ao título */
         color: white !important;
         border-radius: 50% !important;
-        width: 40px !important;
-        height: 40px !important;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.5) !important;
+        width: 45px !important;
+        height: 45px !important;
+        box-shadow: 0px 4px 15px rgba(0,0,0,0.6) !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -46,11 +39,11 @@ st.markdown(
 
     /* 3. AJUSTE DE ESPAÇAMENTO DO CONTEÚDO */
     .block-container {
-        padding-top: 3.5rem !important;
-        margin-top: -25px;
+        padding-top: 3rem !important;
+        margin-top: -20px;
     }
 
-    /* 4. TÍTULO BLINDADO */
+    /* 4. TÍTULO E CARDS */
     .dashboard-title {
         background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%);
         padding: 12px;
@@ -62,10 +55,8 @@ st.markdown(
         margin-bottom: 30px;
         position: relative;
         z-index: 1000;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
 
-    /* 5. CARDS KPIs */
     [data-testid="stMetric"] {
         background-color: #111827 !important;
         border-radius: 15px !important;
