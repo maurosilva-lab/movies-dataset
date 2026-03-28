@@ -3,40 +3,40 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-from datetime import datetime
-
 # ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA
+# 1. CONFIGURAÇÃO DA PÁGINA (WIDE E EXPANDIDA)
 # ==========================================
-# Usamos "collapsed" para esconder por padrão e garantir que o botão controle
 st.set_page_config(
     layout="wide", 
     page_title="Dashboard Risco Logística", 
     page_icon="🚛",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded" # Isso garante que abra com filtros
 )
 
-# --- CSS DE SEGURANÇA E INTERFACE ---
+# --- CSS DE LIMPEZA CIRÚRGICA (Não quebra os filtros) ---
 st.markdown(
     """
     <style>
-    /* 1. BLINDAGEM CONTRA GITHUB E HEADER */
-    [data-testid="stHeader"] {display: none !important;}
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+    /* 1. MATA O GITHUB E O BOTÃO DE DEPLOY (SEM MATAR O HEADER) */
     .stAppDeployButton {display:none !important;}
     [data-testid="stStatusWidget"] {display:none !important;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    
+    /* 2. LIMPA O FUNDO DO HEADER PARA FICAR INVISÍVEL */
+    header {
+        background-color: rgba(0,0,0,0) !important;
+    }
 
-    /* 2. FORÇA LARGURA TOTAL */
+    /* 3. FORÇA A LARGURA TOTAL DO CONTEÚDO */
     .block-container {
         max-width: 98% !important;
         padding-top: 1rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
     }
 
-    /* 3. TÍTULO ESTILIZADO */
+    /* 4. TÍTULO ESTILIZADO */
     .dashboard-title {
         background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%);
         padding: 12px;
@@ -49,44 +49,17 @@ st.markdown(
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
 
-    /* 4. ESTILO DO BOTÃO DE FILTRO NATIVO */
-    .stButton>button {
-        width: 100%;
-        border-radius: 20px;
-        background-color: #1e3a8a;
-        color: white;
-        font-weight: bold;
-        border: none;
+    /* 5. ESTILO DOS CARDS KPIs */
+    [data-testid="stMetric"] {
+        background-color: #111827 !important;
+        border: 1px solid #374151 !important;
+        border-radius: 10px !important;
     }
     </style>
     <div class="dashboard-title">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>
     """,
     unsafe_allow_html=True
 )
-
-# --- CONTROLE MANUAL DA BARRA LATERAL ---
-# Criamos um botão que realmente funciona porque é um componente Streamlit
-col_btn, _ = st.columns([0.2, 0.8])
-with col_btn:
-    # Se o usuário clicar aqui, a página recarrega e a barra lateral aparece/some
-    if st.button("🔍 Mostrar/Esconder Filtros"):
-        st.write("Ajustando painel...") # Pequeno feedback visual
-        st.rerun()
-
-# ==========================================
-# 3. SIDEBAR E FILTROS (REVISADO)
-# ==========================================
-with st.sidebar:
-    st.header("⚙️ Painel de Controle")
-    st.markdown("---")
-    
-    # Botão de atualização dentro da sidebar
-    if st.button('🔄 Forçar Atualização Geral'):
-        st.cache_data.clear()
-        st.rerun()
-    
-    st.divider()
-    # [CONTINUE COM O SEU CÓDIGO DE CARREGAMENTO E FILTROS ABAIXO]
 
 # ==========================================
 # 2. CARREGAMENTO DE DADOS
@@ -111,12 +84,10 @@ def load_data():
 df_raw = load_data()
 
 # ==========================================
-# 3. SIDEBAR E FILTROS (UNIFICADO)
+# 3. SIDEBAR (FILTROS)
 # ==========================================
 with st.sidebar:
     st.header("⚙️ Painel de Controle")
-    st.info("Se os filtros sumirem, use o botão '⚙️ Abrir Filtros' no topo.")
-    
     if st.button('🔄 Atualizar Dados'):
         st.cache_data.clear()
         st.rerun()
@@ -134,11 +105,10 @@ with st.sidebar:
         cds_filtrados = df_raw[df_raw[col_tipo].isin(sel_tipos)][col_cd].unique()
         sel_cds = st.multiselect("Filiais (CDs)", options=sorted(cds_filtrados), default=sorted(cds_filtrados))
     else:
-        st.warning("Aguardando conexão com a planilha...")
         st.stop()
 
 # ==========================================
-# 4. CONTEÚDO VISUAL (DASHBOARD)
+# 4. CONTEÚDO VISUAL
 # ==========================================
 @st.fragment(run_every=600)
 def render_dashboard(df_all, date_val, cds_val):
@@ -152,7 +122,6 @@ def render_dashboard(df_all, date_val, cds_val):
     df_at = df_all[(df_all['DATA'] == date_val) & (df_all[col_cd].isin(cds_val))].copy()
     df_ps = df_all[(df_all['DATA'] == date_ant) & (df_all[col_cd].isin(cds_val))].copy()
 
-    # --- KPIs ---
     c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
 
     with c1:
@@ -187,7 +156,6 @@ def render_dashboard(df_all, date_val, cds_val):
 
     st.divider()
 
-    # --- GRÁFICO PARETO ---
     st.subheader("Concentração de DVG por Unidade")
     df_p = df_at[df_at[col_dvg] > 0].sort_values(col_dvg, ascending=False).reset_index(drop=True)
     if not df_p.empty:
@@ -198,7 +166,6 @@ def render_dashboard(df_all, date_val, cds_val):
         fig_p.update_layout(height=380, template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', yaxis2=dict(overlaying="y", side="right", range=[0, 110]))
         st.plotly_chart(fig_p, use_container_width=True)
 
-    # --- TABELA DETALHADA ---
     st.subheader("📋 Detalhamento Operacional")
     df_table = df_at[[col_cd, 'CIDADE', col_rectec, col_malha, col_dvg, col_risco]].copy()
 
@@ -217,7 +184,5 @@ def render_dashboard(df_all, date_val, cds_val):
 
     st.dataframe(style_performance(df_table.style), use_container_width=True, hide_index=True)
 
-# ==========================================
-# 5. INICIALIZAÇÃO
-# ==========================================
+# Chamada final
 render_dashboard(df_raw, sel_date, sel_cds)
