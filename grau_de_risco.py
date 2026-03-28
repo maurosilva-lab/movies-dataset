@@ -13,13 +13,17 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Inicializa as variáveis de estado para evitar o erro AttributeError
+if "sidebar_state" not in st.session_state:
+    st.session_state.sidebar_state = 'collapsed'
+
 def check_password():
     """Retorna True se o usuário inseriu a senha correta."""
     if "password_correct" not in st.session_state:
         st.markdown("<h2 style='text-align: center;'>🔐 Acesso Restrito - Data Unit</h2>", unsafe_allow_html=True)
         password = st.text_input("Digite a senha para acessar o Dashboard", type="password")
         if st.button("Entrar"):
-            if password == "LOG2026": # Sua senha definida
+            if password == "LOG2026":
                 st.session_state.password_correct = True
                 st.rerun()
             else:
@@ -30,12 +34,10 @@ def check_password():
 # INÍCIO DO CONTEÚDO PROTEGIDO
 if check_password():
 
-   # --- CSS DE SEGURANÇA E BOTÃO FLUTUANTE ---
     # --- CSS DE SEGURANÇA E ESTRUTURA ---
     st.markdown(
         """
         <style>
-        /* 1. BLINDAGEM CONTRA GITHUB E HEADER */
         [data-testid="stHeader"] {display: none !important;}
         .stAppToolbar {display: none !important;}
         [data-testid="stStatusWidget"] {display: none !important;}
@@ -43,7 +45,6 @@ if check_password():
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
 
-        /* 2. FORÇA LARGURA TOTAL E AJUSTE DE MARGEM */
         .block-container {
             max-width: 98% !important;
             padding-top: 1rem !important;
@@ -51,7 +52,6 @@ if check_password():
             padding-right: 2rem !important;
         }
 
-        /* 3. TÍTULO ESTILIZADO */
         .dashboard-title {
             background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%);
             padding: 12px;
@@ -64,7 +64,6 @@ if check_password():
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
 
-        /* 4. ESTILO DO BOTÃO DE FILTROS NATIVO */
         div.stButton > button {
             background-color: #1e3a8a !important;
             color: white !important;
@@ -73,21 +72,29 @@ if check_password():
             height: 3em !important;
             width: 100% !important;
         }
+
+        [data-testid="stMetric"] {
+            background-color: #111827 !important;
+            border: 1px solid #374151 !important;
+            border-radius: 10px !important;
+        }
         </style>
         <div class="dashboard-title">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>
         """,
         unsafe_allow_html=True
     )
 
-    # --- BOTÃO DE COMANDO DOS FILTROS ---
-    # Colocamos um botão real do Streamlit que força a abertura da sidebar
+    # --- BOTÃO DE COMANDO DOS FILTROS (FORA DE FUNÇÕES) ---
     c_menu, _ = st.columns([0.2, 0.8])
     with c_menu:
+        # Lógica de abrir/fechar usando a variável de estado segura
         if st.button("⚙️ ABRIR / FECHAR PAINEL"):
             if st.session_state.sidebar_state == 'collapsed':
                 st.session_state.sidebar_state = 'expanded'
             else:
                 st.session_state.sidebar_state = 'collapsed'
+            # Atualiza o estado da página nativamente
+            st.set_page_config(initial_sidebar_state=st.session_state.sidebar_state)
             st.rerun()
 
     # ==========================================
@@ -151,10 +158,6 @@ if check_password():
         df_at = df_all[(df_all['DATA'] == date_val) & (df_all[col_cd].isin(cds_val))].copy()
         df_ps = df_all[(df_all['DATA'] == date_ant) & (df_all[col_cd].isin(cds_val))].copy()
 
-        # Botão de auxílio para filtros
-        if st.button("🔍 Abrir Filtros"):
-            st.info("Use a seta '>' no canto superior esquerdo para ajustar os filtros.")
-
         c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
 
         with c1:
@@ -215,5 +218,5 @@ if check_password():
 
         st.dataframe(style_performance(df_table.style), use_container_width=True, hide_index=True)
 
-    # Inicialização final
+    # Chamada final da função
     render_dashboard(df_raw, sel_date, sel_cds)
