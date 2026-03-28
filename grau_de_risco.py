@@ -6,55 +6,52 @@ from datetime import datetime
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA (WIDE MODE)
 # ==========================================
-st.set_page_config(
-    layout="wide", 
-    page_title="Dashboard Risco Logística", 
-    page_icon="🚛",
-    initial_sidebar_state="expanded"
-)
-
-# --- CSS DE LIMPEZA, SEGURANÇA E POSICIONAMENTO ---
 st.markdown(
     """
     <style>
-    /* 1. Limpeza total de lixo visual */
+    /* 1. LIMPEZA TOTAL (GITHUB, FORK, HEADER) */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden !important;}
     .stAppDeployButton {display:none !important;} 
+    [data-testid="stStatusWidget"] {display:none !important;}
+    .stAppToolbar {display:none !important;}
+    a[href*="github.com"] {display:none !important;}
 
-    /* 2. FORÇAR A SETINHA DE FILTROS (SIDEBAR) A APARECER */
-    /* Usamos um seletor mais agressivo para o botão de colapso */
+    /* 2. CRIAÇÃO DO BOTÃO FLUTUANTE DE FILTROS */
+    /* Este botão "engana" o Streamlit e fica sempre visível no canto */
     [data-testid="stSidebarCollapseButton"] {
         visibility: visible !important;
-        display: block !important;
         position: fixed !important;
-        top: 10px !important;
-        left: 10px !important;
+        top: 15px !important;
+        left: 15px !important;
         z-index: 99999999 !important;
-        background-color: #1e3a8a !important; /* Azul forte */
+        background-color: #1e3a8a !important;
         color: white !important;
-        width: 50px !important;
-        height: 50px !important;
-        border-radius: 10px !important;
+        border-radius: 50% !important;
+        width: 45px !important;
+        height: 45px !important;
         box-shadow: 0px 0px 15px rgba(30, 58, 138, 0.8) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
     
-    /* Garante que o ícone dentro do botão seja branco e visível */
+    /* Garante que o ícone da setinha dentro do botão fique branco */
     [data-testid="stSidebarCollapseButton"] svg {
         fill: white !important;
-        width: 30px !important;
-        height: 30px !important;
+        width: 25px !important;
+        height: 25px !important;
     }
 
-    /* 3. AJUSTE DE TELA CHEIA E RESPIRO */
+    /* 3. AJUSTE DO DASHBOARD (WIDE MODE) */
     .main .block-container {
         max-width: 98% !important;
-        padding-top: 1rem !important;
-        padding-left: 5rem !important; /* Abre espaço para o botão azul não cobrir o título */
+        padding-top: 1.5rem !important;
+        padding-left: 4.5rem !important; /* Espaço para o botão azul não cobrir o Gauge */
     }
 
-    /* 4. TÍTULO E MÉTRICAS */
+    /* 4. TÍTULO ESTILIZADO */
     .dashboard-title {
         background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%);
         padding: 10px;
