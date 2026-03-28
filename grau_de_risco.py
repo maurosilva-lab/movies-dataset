@@ -2,46 +2,27 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-st.set_page_config(layout="wide", initial_sidebar_state="expanded")
-# ==========================================
-# 1. CONFIGURAÇÃO DA PÁGINA (WIDE MODE)
-# ==========================================
+# No topo do script, logo após o set_page_config
+if 'sidebar_state' not in st.session_state:
+    st.session_state.sidebar_state = 'expanded'
+
+# --- CSS DE SEGURANÇA MÁXIMA ---
 st.markdown(
     """
     <style>
-    /* 1. CONFIGURAÇÃO DE LARGURA */
-    .block-container {
-        max-width: 98% !important;
-        padding-top: 1rem !important;
-        padding-left: 3rem !important; /* Espaço para o botão de segurança */
-    }
-
-    /* 2. ESCONDE O HEADER E O GITHUB (SEGURANÇA) */
+    /* 1. MATA O GITHUB E O HEADER */
     [data-testid="stHeader"] {display: none !important;}
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stAppDeployButton {display:none !important;}
-    [data-testid="stStatusWidget"] {display:none !important;}
-    .stAppToolbar {display:none !important;}
 
-    /* 3. BOTÃO DE EMERGÊNCIA (PARA OS FILTROS NÃO SUMIREM) */
-    /* Este código força o botão de "Abrir Sidebar" a ficar visível e azul */
-    button[data-testid="stSidebarCollapseButton"] {
-        visibility: visible !important;
-        display: block !important;
-        position: fixed !important;
-        top: 10px !important;
-        left: 10px !important;
-        z-index: 9999999 !important;
-        background-color: #1e3a8a !important; /* Azul Data Unit */
-        color: white !important;
-        border-radius: 50% !important;
-        width: 40px !important;
-        height: 40px !important;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.5) !important;
+    /* 2. AJUSTE DE LARGURA */
+    .block-container {
+        max-width: 98% !important;
+        padding-top: 1rem !important;
     }
 
-    /* 4. TÍTULO ESTILIZADO */
+    /* 3. TÍTULO */
     .dashboard-title {
         background: linear-gradient(90deg, #1E3A8A 0%, #1e40af 100%);
         padding: 12px;
@@ -52,18 +33,35 @@ st.markdown(
         font-size: 22px;
         margin-bottom: 25px;
     }
-
-    /* 5. CARDS KPIs */
-    [data-testid="stMetric"] {
-        background-color: #111827 !important;
-        border: 1px solid #374151 !important;
-        border-radius: 10px !important;
-    }
     </style>
     <div class="dashboard-title">INDICADOR DE RISCO LOGÍSTICA - DATA UNIT</div>
     """,
     unsafe_allow_html=True
 )
+
+# --- BOTÃO DE EMERGÊNCIA VIA PYTHON ---
+# Se os filtros sumirem, este botão no topo da página vai ajudar
+c_btn, _ = st.columns([0.1, 0.9])
+with c_btn:
+    if st.button("⚙️ Filtros"):
+        # Isso força o Streamlit a redesenhar a página
+        st.rerun()
+
+# ==========================================
+# 3. SIDEBAR E FILTROS
+# ==========================================
+with st.sidebar:
+    st.header("⚙️ Painel de Controle")
+    # Botão para "esconder" que não quebra o sistema
+    st.info("Use a seta '<<' no topo para recolher.")
+    
+    if st.button('🔄 Atualizar Dados'):
+        st.cache_data.clear()
+        st.rerun()
+    st.divider()
+    
+
+
 # ==========================================
 # 2. CARREGAMENTO DE DADOS
 # ==========================================
