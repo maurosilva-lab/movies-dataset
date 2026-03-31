@@ -16,7 +16,7 @@ st.markdown("""
     
     .header-container { 
         padding: 0.5rem 0; 
-        margin-bottom: 1rem; /* Diminuído para subir os cards */
+        margin-bottom: 3rem; /* Diminuído para subir os cards */
         border-bottom: 1px solid #30363d; 
         text-align: center; 
     }
