@@ -4,41 +4,47 @@ import plotly.express as px
 import re
 
 # 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(layout="wide", page_title="Magalog | Business Intelligence", page_icon="📊")
+st.set_page_config(layout="wide", page_title="Magalog | BI", page_icon="📊")
 
-# --- ESTILIZAÇÃO CSS (AJUSTADO PARA SUBIR INDICADORES) ---
+# --- ESTILIZAÇÃO CSS (CORRIGIDO PARA TÍTULO E ESPAÇAMENTO) ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #0b0e14; }
     
-    /* Reduzindo o espaço no topo da página */
-    .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
+    /* Espaçamento do topo da página para não cobrir o título */
+    .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; }
     
     .header-container { 
-        padding: 0.5rem 0; 
-        margin-bottom: 3rem; /* Diminuído para subir os cards */
+        width: 100%;
+        padding: 10px 0;
+        margin-bottom: 20px; /* Espaço entre título e cards */
         border-bottom: 1px solid #30363d; 
-        text-align: center; 
+        text-align: center;
     }
-    .main-title { color: #f0f6fc; font-size: 22px; font-weight: 700; }
+    .main-title { 
+        color: #f0f6fc; 
+        font-size: 26px; 
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
 
     .metric-card {
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 12px;
-        padding: 12px 15px; /* Reduzido */
-        min-height: 130px; /* Reduzido */
+        padding: 15px;
+        min-height: 140px;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
-    .metric-label { color: #8b949e; font-size: 10px; font-weight: 600; text-transform: uppercase; margin-bottom: 2px; }
-    .metric-value { color: #f0f6fc; font-size: 20px; font-weight: 700; margin-bottom: 2px; }
-    .metric-subtext { color: #8b949e; font-size: 11px; line-height: 1.2; }
+    .metric-label { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+    .metric-value { color: #f0f6fc; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .metric-subtext { color: #8b949e; font-size: 12px; line-height: 1.3; }
     .highlight-blue { color: #58a6ff; font-weight: 700; }
     
-    .progress-container { background-color: #30363d; border-radius: 10px; height: 5px; width: 100%; margin-top: 8px; }
-    .progress-bar { background: linear-gradient(90deg, #58a6ff 0%, #00f2ff 100%); height: 5px; border-radius: 10px; }
+    .progress-container { background-color: #30363d; border-radius: 10px; height: 6px; width: 100%; margin-top: 10px; }
+    .progress-bar { background: linear-gradient(90deg, #58a6ff 0%, #00f2ff 100%); height: 6px; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -78,14 +84,11 @@ try:
             st.cache_data.clear()
             st.rerun()
         st.divider()
-        
         df_raw['tipo_clean'] = df_raw['tipo'].astype(str).str.upper().str.strip()
         df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional)
         df_raw['semestre'] = df_raw['semestre'].astype(str).str.strip()
-
         tipos_sel = st.multiselect("Tipo", options=sorted(df_raw['tipo_clean'].unique()))
         divs_sel = st.multiselect("Divisional", options=sorted(df_raw['divisional'].unique()))
-        semestre_sel = st.multiselect("Semestre", options=sorted(df_raw['semestre'].unique()))
 
     # Tratamento Numérico
     col_fat = [c for c in df_raw.columns if 'faturamento' in c][0]
@@ -95,38 +98,32 @@ try:
     df_raw['v_1c'] = df_raw[col_1c].apply(limpar_valor)
     df_raw['v_fat'] = df_raw[col_fat].apply(limpar_valor)
     df_raw['v_falta'] = df_raw[col_falta].apply(limpar_valor)
-    
-    # Lógica de Finalização (Se ciclo 1 for diferente de zero, está fechado)
     df_raw['is_finalizado'] = df_raw['v_1c'] != 0
 
-    # Aplicação de Filtros
+    # Filtros
     df_filt = df_raw.copy()
     if tipos_sel: df_filt = df_filt[df_filt['tipo_clean'].isin(tipos_sel)]
     if divs_sel: df_filt = df_filt[df_filt['divisional'].isin(divs_sel)]
-    if semestre_sel: df_filt = df_filt[df_filt['semestre'].isin(semestre_sel)]
 
     # --- UI CABEÇALHO ---
-    st.markdown('<div class="header-container"><span class="main-title">BI FECHAMENTO MAGALOG 2026</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="header-container"><div class="main-title">BI FECHAMENTO MAGALOG 2026</div></div>', unsafe_allow_html=True)
 
-    # Cálculos das Métricas
+    # Cálculos
     perda_1c = df_filt['v_1c'].sum()
     falta_vol = df_filt['v_falta'].sum()
     fat_total = df_filt['v_fat'].sum()
-    
     perda_consolidada = perda_1c + falta_vol
     perc_global = (abs(perda_consolidada) / fat_total * 100) if fat_total > 0 else 0.0
 
-    # Lógica de Status (Correção da soma matemática)
+    # Lógica de Status (22/47 -> Pendentes: 25)
     total_un = len(df_filt)
     finalizados = df_filt['is_finalizado'].sum()
-    total_pendentes = total_un - finalizados # Garante que a soma sempre bata
+    total_pendentes = total_un - finalizados
     perc_conclusao = (finalizados / total_un * 100) if total_un > 0 else 0
     
-    # Distribuição de pendentes (Melhorado para ser à prova de falhas)
+    # Exibição Simplificada de Pendentes
     df_pend = df_filt[~df_filt['is_finalizado']]
     pend_1s = len(df_pend[df_pend['semestre'].str.contains('1', na=False)])
-    # O 2º semestre pega o que sobrou para fechar a conta exata do total de pendentes
-    pend_2s = total_pendentes - pend_1s 
 
     # Layout de Cards
     c1, c2, c3 = st.columns([1.2, 1, 1.2])
@@ -148,7 +145,7 @@ try:
             <div class="metric-card">
                 <div class="metric-label">% Perda Global</div>
                 <div class="metric-value">{perc_global:.3f}%</div>
-                <div class="metric-subtext">Resultado consolidado<br>sobre faturamento.</div>
+                <div class="metric-subtext">Resultado total consolidado<br>sobre o faturamento.</div>
             </div>
         """, unsafe_allow_html=True)
 
@@ -159,7 +156,7 @@ try:
                 <div class="metric-value">{int(finalizados)} / {total_un} <span style="font-size:13px; color:#58a6ff;">({perc_conclusao:.1f}%)</span></div>
                 <div class="metric-subtext">
                     Pendentes 1º Sem: <span class="highlight-blue">{pend_1s}</span><br>
-                    Pendentes 2º Sem: <span class="highlight-blue">{pend_2s}</span>
+                    Total Pendentes: <span class="highlight-blue">{total_pendentes}</span>
                 </div>
                 <div class="progress-container"><div class="progress-bar" style="width: {perc_conclusao}%"></div></div>
             </div>
@@ -167,7 +164,7 @@ try:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Gráficos (Ajustados para Layout Compacto)
+    # Gráficos e Tabela
     col_g1, col_g2 = st.columns([1, 1.2])
     with col_g1:
         st.subheader("Perda por Divisional")
