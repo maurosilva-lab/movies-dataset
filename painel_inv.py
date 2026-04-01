@@ -4,40 +4,54 @@ import plotly.express as px
 import plotly.graph_objects as go
 import re
 
-# 1. CONFIGURAÇÃO DA PÁGINA (ESTILO DASHBOARD PRO)
+# 1. CONFIGURAÇÃO DA PÁGINA (ESTILO DASHBOARD PRO) - ESSENCIAL SER A PRIMEIRA CHAMADA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
 # --- ESTILIZAÇÃO CSS AVANÇADA (ESTILO NEON / FIGMA) ---
+# Adicionei a tag !important em alguns pontos para forçar a sobreposição do padrão do Streamlit
 st.markdown("""
     <style>
-    [data-testid="stAppViewContainer"] { background-color: #0d1117; }
-    .block-container { padding-top: 1rem !important; max-width: 95%; }
+    /* FUNDO DA PÁGINA */
+    [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
     
-    /* TÍTULO COM GRADIENTE */
-    .header-box {
-        background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
-        padding: 15px; border-radius: 12px; text-align: center;
-        margin-bottom: 25px; box-shadow: 0 4px 20px rgba(0, 210, 255, 0.2);
+    /* AJUSTE DO CONTAINER PRINCIPAL */
+    .block-container { 
+        padding-top: 2rem !important; 
+        padding-bottom: 2rem !important;
+        max-width: 95% !important; 
     }
-    .header-title { color: white; font-size: 28px; font-weight: 800; letter-spacing: 2px; margin:0; }
+    
+    /* TÍTULO COM GRADIENTE NO TOPO */
+    .header-box {
+        background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
+        padding: 20px; border-radius: 12px; text-align: center;
+        margin-bottom: 30px; box-shadow: 0 4px 20px rgba(0, 210, 255, 0.2);
+    }
+    .header-title { color: white !important; font-size: 30px !important; font-weight: 800 !important; letter-spacing: 2px; margin:0; }
 
     /* CARDS ESTILO NEON */
     .card-kpi {
         background: #161b22; border: 1px solid #30363d;
-        border-radius: 15px; padding: 20px; text-align: center;
+        border-radius: 15px; padding: 25px; text-align: center;
         transition: transform 0.3s;
+        min-height: 160px;
     }
     .card-kpi:hover { transform: translateY(-5px); border-color: #00d2ff; }
-    .label-kpi { color: #8b949e; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; }
-    .value-kpi { color: #f0f6fc; font-size: 26px; font-weight: 800; }
-    .sub-kpi { color: #00d2ff; font-size: 13px; margin-top: 5px; font-weight: 500; }
     
-    /* BARRA DE PROGRESSO CUSTOM */
-    .progress-bg { background-color: #30363d; border-radius: 10px; height: 8px; width: 100%; margin-top: 15px; }
+    /* TEXTOS DENTRO DOS CARDS */
+    .label-kpi { color: #8b949e !important; font-size: 12px !important; font-weight: 600 !important; text-transform: uppercase; margin-bottom: 10px; }
+    .value-kpi { color: #f0f6fc !important; font-size: 28px !important; font-weight: 800 !important; }
+    .sub-kpi { color: #00d2ff !important; font-size: 14px !important; margin-top: 8px; font-weight: 500; }
+    
+    /* BARRA DE PROGRESSO CUSTOMIZADA NO CARD DE EVOLUÇÃO */
+    .progress-bg { background-color: #30363d; border-radius: 10px; height: 10px; width: 100%; margin-top: 20px; }
     .progress-fill { 
         background: linear-gradient(90deg, #00d2ff 0%, #00f2ff 100%); 
-        height: 8px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 242, 255, 0.5); 
+        height: 10px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 242, 255, 0.5); 
     }
+    
+    /* CUSTOMIZAÇÃO DE TÍTULOS DE SEÇÃO */
+    h2, h3 { color: #f0f6fc !important; font-weight: 700 !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -50,9 +64,7 @@ def limpar_valor(valor):
     except: return 0.0
 
 def mapear_divisional(cd_bruto):
-    # Retorna "Indefinido" em vez de None para evitar erro de comparação float vs str
-    if pd.isna(cd_bruto) or str(cd_bruto).strip() in ["", "nan", "None", "0", "0.0"]: 
-        return "Indefinido"
+    if pd.isna(cd_bruto) or str(cd_bruto).strip() in ["", "nan", "None", "0", "0.0"]: return "Indefinido"
     try:
         s_cd = str(cd_bruto).split('.')[0]
         cd = int(re.sub(r'\D', '', s_cd))
@@ -107,15 +119,12 @@ try:
         opcoes_div = sorted([x for x in df_raw['divisional'].unique() if x != "Indefinido"])
         divs_sel = st.multiselect("Filtrar por Divisional", options=opcoes_div)
 
-    # 3. Processamento de Colunas Dinâmicas
+    # 3. Processamento Numérico
     def get_col(name_snippet):
         match = [c for c in df_raw.columns if name_snippet in c]
         return match[0] if match else None
 
-    c_fat = get_col('faturamento')
-    c_1c = get_col('1__ciclo')
-    c_falta = get_col('falta_vol')
-
+    c_fat = get_col('faturamento'); c_1c = get_col('1__ciclo'); c_falta = get_col('falta_vol')
     df_raw['v_1c'] = df_raw[c_1c].apply(limpar_valor) if c_1c else 0.0
     df_raw['v_fat'] = df_raw[c_fat].apply(limpar_valor) if c_fat else 0.0
     df_raw['v_falta'] = df_raw[c_falta].apply(limpar_valor) if c_falta else 0.0
@@ -125,18 +134,14 @@ try:
     if tipos_sel: df_filt = df_filt[df_filt['tipo_clean'].isin(tipos_sel)]
     if divs_sel: df_filt = df_filt[df_filt['divisional'].isin(divs_sel)]
 
-    # --- UI PRINCIPAL ---
+    # --- UI PRINCIPAL --- ESSENCIAL QUE ISTO FIQUE NO TOPO ---
     st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO MAGALOG 2026</p></div>', unsafe_allow_html=True)
 
     # KPIs Superiores
-    perda_1c = df_filt['v_1c'].sum()
-    falta_vol = df_filt['v_falta'].sum()
-    fat_total = df_filt['v_fat'].sum()
+    perda_1c = df_filt['v_1c'].sum(); falta_vol = df_filt['v_falta'].sum(); fat_total = df_filt['v_fat'].sum()
     perda_consolidada = perda_1c + falta_vol
     perc_global = (abs(perda_consolidada) / fat_total * 100) if fat_total > 0 else 0.0
-    
-    total_un = len(df_filt)
-    finalizados = df_filt['is_finalizado'].sum()
+    total_un = len(df_filt); finalizados = df_filt['is_finalizado'].sum()
     perc_conclusao = (finalizados / total_un * 100) if total_un > 0 else 0
 
     k1, k2, k3, k4 = st.columns(4)
@@ -165,19 +170,20 @@ try:
     with g1:
         st.subheader("📍 Perda por Gerência")
         df_pie = df_filt[~df_filt['divisional'].isin(['Indefinido', 'nan', ''])]
-        # Cores manuais para evitar erro de atributo no Plotly
+        # Fixei as cores exatas para o azul neon igual ao da sua imagem exemplo
         fig_p = px.pie(df_pie, values=df_pie['v_1c'].abs(), names='divisional', hole=0.7, 
-                       color_discrete_sequence=["#00d2ff", "#3a7bd5", "#7000ff", "#00f2ff"])
-        fig_p.update_layout(template="plotly_dark", height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                       color_discrete_sequence=["#00d2ff", "#008cff", "#0040ff", "#00f2ff"])
+        fig_p.update_layout(template="plotly_dark", height=380, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig_p, use_container_width=True)
 
     with g2:
         st.subheader("🏢 Saúde por CD")
         df_tree = df_filt[df_filt['v_1c'] != 0].copy()
         df_tree['cd'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
+        # Usei uma escala de azul para o treemap
         fig_t = px.treemap(df_tree, path=['divisional', 'cd'], values=df_tree['v_1c'].abs(), 
-                           color='v_1c', color_continuous_scale='RdBu_r')
-        fig_t.update_layout(template="plotly_dark", height=350, paper_bgcolor='rgba(0,0,0,0)')
+                           color='v_1c', color_continuous_scale='Blues')
+        fig_t.update_layout(template="plotly_dark", height=380, paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig_t, use_container_width=True)
 
     # --- TABELA DETALHADA ---
@@ -189,19 +195,17 @@ try:
     df_exibir = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd', 'local', 'v_1c', '% Perda', 'v_falta', 'is_finalizado']]
 
     def style_performance(row):
-        styles = [''] * len(row)
-        v1c = row['v_1c']
+        styles = [''] * len(row); v1c = row['v_1c']
         bg = 'background-color: #641e1e; color: #ff9999; font-weight: bold;' if v1c < 0 else 'background-color: #1e4620; color: #99ff99; font-weight: bold;'
-        for col in ['v_1c', '% Perda', 'v_falta']:
-            styles[row.index.get_loc(col)] = bg
+        for col in ['v_1c', '% Perda', 'v_falta']: styles[row.index.get_loc(col)] = bg
         return styles
 
     st.dataframe(df_exibir.style.apply(style_performance, axis=1), column_config={
         "v_1c": st.column_config.NumberColumn("Resultado", format="R$ %.2f"),
-        "% Perda": st.column_config.NumberColumn("%", format="%.3f%%"),
+        "% Perda": st.column_config.NumberColumn("%", format="%.4f%%"),
         "v_falta": st.column_config.NumberColumn("Falta Vol", format="%.0f"),
         "is_finalizado": st.column_config.CheckboxColumn("Fim")
     }, use_container_width=True, hide_index=True)
 
 except Exception as e:
-    st.error(f"⚠️ Erro ao carregar dados: {e}")
+    st.error(f"⚠️ Erro crítico: {e}")
