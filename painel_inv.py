@@ -180,44 +180,24 @@ try:
         ).reset_index()
         resumo_tipos['Pen'] = resumo_tipos['Total'] - resumo_tipos['Fim']
 
-        # Construção da mini tabela em HTML
+        # Construção da mini tabela em HTML (TUDO NA MESMA LINHA PARA EVITAR BUG DO MARKDOWN)
         linhas_html = ""
         for _, row in resumo_tipos.iterrows():
-            linhas_html += f"""
-                <tr>
-                    <td style="text-align:left; color:#8b949e;">{row['tipo_clean']}</td>
-                    <td style="color:#f0f6fc;">{row['Total']}</td>
-                    <td style="color:#3fb950;">{row['Fim']}</td>
-                    <td style="color:#ff4b4b;">{row['Pen']}</td>
-                </tr>
-            """
+            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:2px;'>{row['tipo_clean']}</td><td style='color:#f0f6fc;'>{row['Total']}</td><td style='color:#3fb950;'>{row['Fim']}</td><td style='color:#ff4b4b;'>{row['Pen']}</td></tr>"
 
-        tabela_html = f"""
-            <table style="width:100%; font-size:10px; margin-top:10px; border-top:1px solid #30363d;">
-                <thead>
-                    <tr style="color:#8b949e; text-transform:uppercase;">
-                        <th style="text-align:left;">Tipo</th>
-                        <th>Tot</th>
-                        <th>Fim</th>
-                        <th>Pen</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {linhas_html}
-                </tbody>
-            </table>
-        """
+        tabela_html = f"<table style='width:100%; font-size:11px; margin-top:10px; border-top:1px solid #30363d; padding-top:5px;'><thead><tr style='color:#8b949e; text-transform:uppercase;'><th style='text-align:left;'>Tipo</th><th>Tot</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table>"
 
         perc_finalizadas = (fechadas / total_uds * 100) if total_uds > 0 else 0
         
-        st.markdown(f'''
-            <div class="card-kpi" style="min-height: 180px;">
-                <div class="label-kpi">Total Unidades</div>
-                <div class="value-kpi" style="margin-bottom:0;">{total_uds}</div>
-                <div class="sub-kpi">{perc_finalizadas:.1f}% Finalizadas</div>
-                {tabela_html}
-            </div>
-        ''', unsafe_allow_html=True)
+        # O HTML final sendo passado sem espaços no começo
+        html_final = f"""<div class="card-kpi" style="min-height: 180px;">
+<div class="label-kpi">Total Unidades</div>
+<div class="value-kpi" style="margin-bottom:0;">{total_uds}</div>
+<div class="sub-kpi">{perc_finalizadas:.1f}% Finalizadas</div>
+{tabela_html}
+</div>"""
+
+        st.markdown(html_final, unsafe_allow_html=True)
         
     with c5:
         pf = (fechadas/total_uds*100) if total_uds > 0 else 0
