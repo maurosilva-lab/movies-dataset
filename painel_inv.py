@@ -150,8 +150,24 @@ try:
     g1, g2 = st.columns([1, 1.2])
     with g1:
         st.subheader("Perda por Divisional")
-        fig = px.pie(df_filt, values=df_filt['v_1c'].abs(), names='divisional', hole=0.6)
-        fig.update_layout(template="plotly_dark", height=300, margin=dict(t=0, b=0, l=0, r=0), paper_bgcolor='rgba(0,0,0,0)')
+        
+        # FILTRO PARA LIMPAR O 'NULL' DO GRÁFICO
+        # Remove valores nulos, a string 'None', 'null' ou espaços vazios
+        df_pie = df_filt[
+            df_filt['divisional'].notna() & 
+            (~df_filt['divisional'].astype(str).str.lower().isin(['none', 'null', 'nan', '']))
+        ].copy()
+
+        # Usamos o df_pie apenas para este gráfico
+        fig = px.pie(df_pie, values=df_pie['v_1c'].abs(), names='divisional', hole=0.6)
+        
+        fig.update_layout(
+            template="plotly_dark", 
+            height=300, 
+            margin=dict(t=10, b=10, l=10, r=10), 
+            paper_bgcolor='rgba(0,0,0,0)',
+            showlegend=True
+        )
         st.plotly_chart(fig, use_container_width=True)
 
     with g2:
