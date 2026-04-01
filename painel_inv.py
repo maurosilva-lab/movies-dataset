@@ -15,7 +15,7 @@ st.markdown("""
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
     .header-box {
         background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
-        padding: 0.8rem !important; border-radius: 0 0 15px 15px; text-align: center;
+        padding: 2rem !important; border-radius: 0 0 15px 15px; text-align: center;
         margin-bottom: 1.5rem !important; box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4);
     }
     .header-title { color: white !important; font-size: 24px !important; font-weight: 800 !important; margin:0; }
