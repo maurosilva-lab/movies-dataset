@@ -6,49 +6,52 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
-# --- ESTILIZAÇÃO CSS (Cards Flutuantes + Big Numbers) ---
+# --- ESTILIZAÇÃO CSS (Título Ajustado + Gráficos Flutuantes) ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
     .main { padding: 0rem !important; }
     
-    /* Header Custom */
+    /* Header Ajustado para Cima */
     .header-box {
         background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
-        padding: 1.5rem; border-radius: 0 0 15px 15px; text-align: center;
-        margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
+        padding: 0.8rem !important; /* Reduzido de 1.5rem */
+        border-radius: 0 0 15px 15px; 
+        text-align: center;
+        margin-bottom: 1rem !important; /* Reduzido para o título subir */
+        box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
     }
-    .header-title { color: white !important; font-size: 28px !important; font-weight: 800 !important; margin:0; }
+    .header-title { color: white !important; font-size: 24px !important; font-weight: 800 !important; margin:0; }
 
-    /* EFEITO FLUTUANTE PARA CARDS E GRÁFICOS */
+    /* EFEITO FLUTUANTE EXECUTIVO */
     .stPlotlyChart, div[data-testid="stDataFrame"], .card-kpi {
         background-color: #161b22 !important;
         padding: 15px !important;
         border-radius: 15px !important;
         border: 1px solid #30363d !important;
-        box-shadow: 0 8px 16px rgba(0,0,0,0.4) !important; /* Efeito flutuante */
-        margin-bottom: 10px !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+        margin-bottom: 12px !important;
     }
 
     .card-kpi {
         text-align: center;
-        min-height: 130px;
+        min-height: 120px;
         border-bottom: 4px solid #00d2ff !important;
     }
-    .label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
-    .value-kpi { color: #f0f6fc; font-size: 30px !important; font-weight: 900 !important; margin: 5px 0; }
-    .sub-kpi { color: #00d2ff; font-size: 12px; font-weight: 500; }
+    .label-kpi { color: #8b949e; font-size: 10px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
+    .value-kpi { color: #f0f6fc; font-size: 28px !important; font-weight: 900 !important; margin: 4px 0; }
+    .sub-kpi { color: #00d2ff; font-size: 11px; font-weight: 500; }
 
     /* Barra de Target */
     .target-container {
-        background: #21262d; border-radius: 4px; height: 25px; 
-        position: relative; overflow: hidden; margin: 10px 0;
+        background: #21262d; border-radius: 4px; height: 22px; 
+        position: relative; overflow: hidden; margin: 8px 0;
         display: flex; align-items: center; justify-content: center;
     }
     .target-fill { background: #00d2ff; height: 100%; position: absolute; left: 0; z-index: 1; }
-    .target-text { color: white; font-weight: 800; z-index: 2; font-size: 13px; }
+    .target-text { color: white; font-weight: 800; z-index: 2; font-size: 12px; }
     .target-line { position: absolute; height: 100%; width: 2px; background: #00f2ff; z-index: 3; }
-    .target-label { font-size: 9px; color: #8b949e; }
+    .target-label { font-size: 8px; color: #8b949e; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -107,15 +110,12 @@ try:
     # CÁLCULOS
     p1c = df_filt['v_1c'].sum(); vfal = df_filt['v_falta'].sum(); fat_total = df_filt['v_fat'].sum()
     perda_total = p1c + vfal
-    
-    # VOLTA DO PERCENTUAL GLOBAL
     perc_global = (abs(perda_total) / fat_total * 100) if fat_total > 0 else 0
     perc_falta = (vfal / perda_total * 100) if perda_total != 0 else 0
-    
     total_uds = len(df_filt); fechadas = df_filt['is_fin'].sum(); pendentes = total_uds - fechadas
     target_pos = 70
 
-    # 5 CARDS KPI REORGANIZADOS
+    # CARDS KPI
     m1, m2, m3, m4, m5 = st.columns(5)
     with m1: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consolidada</div><div class="value-kpi">R$ {perda_total:,.0f}</div><div class="sub-kpi">Impacto: {perc_global:.3f}% do Fat.</div></div>', unsafe_allow_html=True)
     with m2: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Volume Falta</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">{abs(perc_falta):.1f}% do Total Perda</div></div>', unsafe_allow_html=True)
@@ -130,17 +130,21 @@ try:
         <div style="display:flex;justify-content:space-between;"><span class="target-label">0</span><span class="target-label">target</span><span class="target-label">{total_uds}</span></div></div>''', unsafe_allow_html=True)
 
     # --- GRÁFICOS DO MEIO ---
-    st.markdown("<br>", unsafe_allow_html=True)
     g1, g2 = st.columns([1, 1.1])
     
     with g1:
         st.subheader("📊 Resultado Consolidado (1C + Falta)")
         df_proc = df_filt.copy(); df_proc['res_total'] = df_proc['v_1c'] + df_proc['v_falta']
+        # Agrupar e filtrar apenas tipos que existem nos dados atuais para evitar barras vazias
         df_p = df_proc.groupby('tipo_clean')['res_total'].sum().reset_index()
+        df_p = df_p[df_p['res_total'] != 0] 
+        
         fig_b = px.bar(df_p, x='tipo_clean', y=df_p['res_total'].abs(), text='res_total', color='tipo_clean', 
                        color_discrete_map={'CD':'#3a7bd5','LV':'#7000ff','DQS':'#00f2ff'})
-        fig_b.update_traces(texttemplate='R$ %{text:,.0f}', textposition='outside')
-        fig_b.update_layout(template="plotly_dark", height=380, showlegend=False, yaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        fig_b.update_traces(texttemplate='R$ %{text:,.0f}', textposition='outside', cliponaxis=False)
+        fig_b.update_layout(template="plotly_dark", height=380, showlegend=False, 
+                            yaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', 
+                            plot_bgcolor='rgba(0,0,0,0)', xaxis_title="")
         st.plotly_chart(fig_b, use_container_width=True)
 
     with g2:
@@ -154,7 +158,6 @@ try:
         st.plotly_chart(fig_t, use_container_width=True)
 
     # --- BASE (TABELA + PIZZA) ---
-    st.markdown("<br>", unsafe_allow_html=True)
     b1, b2 = st.columns([3, 1.2])
     with b1:
         st.subheader("📋 Detalhamento")
@@ -163,7 +166,7 @@ try:
         df_tab['cd_t'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
         df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd_t', 'local', 'v_1c', '%', 'v_falta', 'is_fin']]
         st.dataframe(df_ex.style.apply(lambda r: ['background-color: #451a1a' if r['v_1c'] < 0 else 'background-color: #1a4523']*len(r), axis=1),
-                     column_config={"v_1c": st.column_config.NumberColumn("Resultado", format="R$ %.2f"), "%": st.column_config.NumberColumn("%", format="%.3f%%"), "v_falta": st.column_config.NumberColumn("Falta", format="%.0f")},
+                     column_config={"v_1c": st.column_config.NumberColumn("Resultado", format="R$ %.2f"), "%": st.column_config.NumberColumn("%", format="%.4f%%"), "v_falta": st.column_config.NumberColumn("Falta", format="%.0f")},
                      use_container_width=True, hide_index=True, height="content")
     with b2:
         st.subheader("📍 Perda / Gerente")
