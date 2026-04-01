@@ -138,36 +138,43 @@ try:
     st.subheader("📋 Detalhamento por Unidade")
     df_tab = df_filt.copy()
     
-    # 1. Cálculo do % de Perda (Tratando divisão por zero e garantindo que seja numérico)
-    df_tab['v_fat'] = pd.to_numeric(df_tab['v_fat'], errors='coerce').fillna(0)
-    df_tab['% Perda'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
+    # 1. TRATAMENTO PESADO DE NULOS NO FATURAMENTO
+    # Converte para string, limpa espaços, remove R$, converte para número e o que sobrar de vazio vira 0
+    df_tab['v_fat'] = pd.to_numeric(
+        df_tab['v_fat'].astype(str).str.replace('R$', '', regex=False).str.strip(), 
+        errors='coerce'
+    ).fillna(0.0)
     
-    # 2. Limpeza do CD
+    # 2. CÁLCULO DO % (Agora com garantia de que v_fat nunca é 'vazio' técnico)
+    # Se faturamento for 0, o resultado será 0 em vez de vazio
+    df_tab['% Perda'] = df_tab.apply(
+        lambda x: (x['v_1c'] / x['v_fat'] * 100) if x['v_fat'] != 0 else 0.0, 
+        axis=1
+    ).fillna(0.0)
+    
+    # 3. Limpeza do CD e Seleção de colunas
     df_tab['cd'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-    
-    # 3. Colunas para exibição
     colunas_show = ['semestre', 'tipo_clean', 'divisional', 'cd', 'local', 'v_1c', '% Perda', 'v_falta', 'is_finalizado']
     df_exibir = df_tab[colunas_show]
 
-    # 4. FUNÇÃO DE ESTILIZAÇÃO (Pintando as 3 colunas de indicadores)
+    # 4. FUNÇÃO DE ESTILIZAÇÃO
     def style_performance(row):
         styles = [''] * len(row)
         v1c = row['v_1c']
         
-        # Define as cores baseado no Resultado 1C
+        # Cores para Dark Mode (Vermelho/Verde)
         if v1c < 0:
-            bg = 'background-color: #641e1e; color: #ff9999; font-weight: bold;' # Vermelho
+            bg = 'background-color: #641e1e; color: #ff9999; font-weight: bold;'
         else:
-            bg = 'background-color: #1e4620; color: #99ff99; font-weight: bold;' # Verde
+            bg = 'background-color: #1e4620; color: #99ff99; font-weight: bold;'
 
-        # Aplica o estilo nas colunas financeiras e de volume
+        # Pintar colunas financeiras e Falta Vol
         for col_name in ['v_1c', '% Perda', 'v_falta']:
-            idx = row.index.get_loc(col_name)
-            styles[idx] = bg
-        
+            if col_name in row.index:
+                styles[row.index.get_loc(col_name)] = bg
         return styles
 
-    # 5. RENDERIZAÇÃO DA TABELA
+    # 5. EXIBIÇÃO
     st.dataframe(
         df_exibir.style.apply(style_performance, axis=1),
         column_config={
@@ -175,9 +182,7 @@ try:
             "% Perda": st.column_config.NumberColumn("% Perda", format="%.4f%%"),
             "v_falta": st.column_config.NumberColumn("Falta Vol", format="%.0f"),
             "is_finalizado": st.column_config.CheckboxColumn("Fim?"),
-            "tipo_clean": "Tipo", 
-            "cd": "CD", 
-            "local": "Unidade"
+            "tipo_clean": "Tipo", "cd": "CD", "local": "Unidade"
         },
         use_container_width=True,
         hide_index=True
