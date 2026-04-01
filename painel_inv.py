@@ -53,9 +53,10 @@ def load_data():
     df.columns = [re.sub(r'[^a-zA-Z0-9]', '_', str(c).strip().lower()) for c in df.columns]
     
     # --- CURA DOS DADOS (Evita o erro de float vs str) ---
-    for col in df.columns:
-        if col in ['tipo', 'semestre', 'cd', 'local']:
-            df[col] = df[col].astype(str).replace('nan', '')
+    for col in ['tipo', 'semestre', 'cd', 'local']:
+     if col in df.columns:
+        # Transforma tudo em texto e remove o 'nan' (vazio)
+        df[col] = df[col].astype(str).replace('nan', '')
             
     return df
 
