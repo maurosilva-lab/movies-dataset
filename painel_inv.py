@@ -6,12 +6,12 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
-# --- CSS (Espaçamento Superior e Estilo Magalog) ---
+# --- CSS (Ajuste de Topo e Estilo Magalog) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] { display: none; }
     .block-container { 
-        padding-top: 1.5rem !important; 
+        padding-top: 1.8rem !important; 
         margin-top: -15px !important; 
     }
     [data-testid="stAppViewContainer"] { background-color: #0b0e14 !important; }
@@ -34,7 +34,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE LIMPEZA PESADA ---
+# --- FUNÇÕES DE LIMPEZA SÊNIOR ---
 @st.cache_data(ttl=60)
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1iaHnigQGOH5w4xFlZXN0cXYSZlLqPuHE1Pdsgy0XSdI/export?format=csv&gid=1358149674"
@@ -43,8 +43,8 @@ def load_data():
     return df
 
 def force_numeric(v):
+    """Garante que qualquer valor vire um float puro ou 0.0"""
     if pd.isna(v): return 0.0
-    # Remove R$, espaços e ajusta separadores
     s = str(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
     s = re.sub(r'[^0-9\.\-]', '', s)
     try:
@@ -55,26 +55,25 @@ def force_numeric(v):
 try:
     df_raw = load_data().copy()
     
-    # Identificação de Colunas
+    # Mapeamento Dinâmico
     c_1c = next((c for c in df_raw.columns if '1' in c and 'ciclo' in c), None)
     c_falta = next((c for c in df_raw.columns if 'falta' in c and 'vol' in c), None)
     c_fat = next((c for c in df_raw.columns if 'faturamento' in c or 'fat' in c), None)
     c_div = next((c for c in df_raw.columns if 'divisional' in c or 'gerente' in c), None)
 
-    # 1ª CAMADA DE PROTEÇÃO (VETORIZADA)
-    # Convertemos para String, limpamos e forçamos o tipo Float64 do Pandas
-    for col_ref, col_name in [(c_1c, 'v_1c'), (c_falta, 'v_falta'), (c_fat, 'v_fat')]:
+    # LIMPEZA VETORIZADA (Mata o erro na origem)
+    for col_ref, col_new in [(c_1c, 'v_1c'), (c_falta, 'v_falta'), (c_fat, 'v_fat')]:
         if col_ref:
-            df_raw[col_name] = df_raw[col_ref].apply(force_numeric).astype(float)
+            df_raw[col_new] = df_raw[col_ref].apply(force_numeric).astype(float)
         else:
-            df_raw[col_name] = 0.0
+            df_raw[col_new] = 0.0
     
-    df_raw['tipo_clean'] = df_raw['tipo'].fillna('OUTROS').astype(str).str.upper().str.strip()
+    df_raw['tipo_clean'] = df_raw['tipo'].fillna('OUTROS').astype(str).str.upper()
     df_raw['cd_t'] = df_raw['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
     df_raw['div_clean'] = df_raw[c_div].fillna('OUTROS').astype(str).str.upper() if c_div else 'OUTROS'
     df_raw['is_fin'] = df_raw['v_1c'] != 0
 
-    # --- SIDEBAR (FILTROS REATIVADOS) ---
+    # --- SIDEBAR (FILTROS COMPLETOS) ---
     with st.sidebar:
         st.header("⚙️ Controle")
         if st.button("🔄 Atualizar Dados"):
@@ -92,28 +91,24 @@ try:
     # --- HEADER ---
     st.markdown('<div class="header-box"><p class="header-title">PAINEL FECHAMENTO MAGALOG 2026</p></div>', unsafe_allow_html=True)
 
-    # --- KPIs (Ordem do Print) ---
-    v_1c_sum = df_filt['v_1c'].sum()
-    v_falta_sum = df_filt['v_falta'].sum()
-    v_perda_total = v_1c_sum + v_falta_sum
-    faturamento = df_filt['v_fat'].sum()
-    perc_perda = (abs(v_perda_total) / faturamento * 100) if faturamento > 0 else 0.0
+    # --- KPIs ---
+    v_perda_ano = df_filt['v_1c'].sum() + df_filt['v_falta'].sum()
+    perc_perda = (abs(v_perda_ano) / df_filt['v_fat'].sum() * 100) if df_filt['v_fat'].sum() > 0 else 0.0
     
-    total_un = len(df_filt)
-    finalizadas = df_filt['is_fin'].sum()
-
     k1, k2, k3, k4, k5 = st.columns(5)
-    with k1: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Perda Ano</p><p class="value-kpi">R$ {v_perda_total:,.0f}</p></div>', unsafe_allow_html=True)
-    with k2: st.markdown(f'<div class="card-kpi"><p class="label-kpi">1º Ciclo</p><p class="value-kpi">R$ {v_1c_sum:,.0f}</p></div>', unsafe_allow_html=True)
-    with k3: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Falta Vol</p><p class="value-kpi">R$ {v_falta_sum:,.0f}</p></div>', unsafe_allow_html=True)
+    with k1: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Perda Ano</p><p class="value-kpi">R$ {v_perda_ano:,.0f}</p></div>', unsafe_allow_html=True)
+    with k2: st.markdown(f'<div class="card-kpi"><p class="label-kpi">1º Ciclo</p><p class="value-kpi">R$ {df_filt["v_1c"].sum():,.0f}</p></div>', unsafe_allow_html=True)
+    with k3: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Falta Vol</p><p class="value-kpi">R$ {df_filt["v_falta"].sum():,.0f}</p></div>', unsafe_allow_html=True)
     with k4: st.markdown(f'<div class="card-kpi"><p class="label-kpi">% Perdas</p><p class="value-kpi">{perc_perda:.3f}%</p></div>', unsafe_allow_html=True)
-    with k5: st.markdown(f'''<div class="card-kpi"><p class="label-kpi">Status Unidades</p><p class="value-kpi">{total_un}</p>
-                <p class="sub-value"><span style="color:#00d2ff">Fin: {finalizadas}</span> | <span style="color:#ff4b4b">Pend: {total_un-finalizadas}</span></p></div>''', unsafe_allow_html=True)
+    with k5: 
+        total_u = len(df_filt); fin_u = df_filt['is_fin'].sum()
+        st.markdown(f'''<div class="card-kpi"><p class="label-kpi">Status Unidades</p><p class="value-kpi">{total_u}</p>
+                    <p class="sub-value"><span style="color:#00d2ff">Fin: {fin_u}</span> | <span style="color:#ff4b4b">Pend: {total_u-fin_u}</span></p></div>''', unsafe_allow_html=True)
 
     # --- GRÁFICOS ---
     g1, g2 = st.columns([1.2, 1])
     with g1:
-        st.markdown("**Perdas vs. Estornos (Visão por Tipo)**")
+        st.markdown("**Perdas vs. Estornos**")
         df_g = df_filt.groupby('tipo_clean')[['v_1c', 'v_falta']].sum().sum(axis=1).reset_index(name='total')
         fig = px.bar(df_g, x='tipo_clean', y=df_g['total'].abs(), color='tipo_clean', 
                      color_discrete_map={'CD':'#3a86ff','LV':'#8338ec','DQS':'#06d6a0'},
@@ -129,33 +124,24 @@ try:
         fig_t.update_layout(template="plotly_dark", height=380, margin=dict(t=0,b=0,l=0,r=0))
         st.plotly_chart(fig_t, use_container_width=True)
 
-    # --- TABELA (Sanitização Final Sênior) ---
+    # --- TABELA FINAL (Proteção Extra de Comparação) ---
     st.markdown("**Detalhamento Operacional**")
     df_tab = df_filt.copy()
-    df_tab['perc_unid'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).replace([float('inf'), float('-inf')], 0).fillna(0)
+    df_tab['perc_u'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).replace([float('inf'), float('-inf')], 0).fillna(0)
+    df_show = df_tab[['tipo_clean', 'cd_t', 'div_clean', 'v_1c', 'perc_u', 'v_falta', 'is_fin']].reset_index(drop=True)
     
-    # Seleção de colunas para exibição
-    df_show = df_tab[['tipo_clean', 'cd_t', 'div_clean', 'v_1c', 'perc_unid', 'v_falta', 'is_fin']].reset_index(drop=True)
-    
-    # 2ª CAMADA DE PROTEÇÃO: Função de estilo com cast local forçado
     def style_final(row):
+        # Cast preventivo: se não for float, vira 0.0 antes do < 0
         try:
-            # Forçamos a leitura como float para a comparação lógica
             val = float(row['v_1c'])
         except:
             val = 0.0
-        
         color = '#451a1a' if val < 0 else '#1a4523'
         return [f'background-color: {color}'] * len(row)
 
-    # Renderização final com formatação de MOEDA R$
     st.dataframe(
         df_show.style.apply(style_final, axis=1)
-        .format({
-            'v_1c': 'R$ {:,.2f}', 
-            'v_falta': 'R$ {:,.2f}', 
-            'perc_unid': '{:.4f}%'
-        }), 
+        .format({'v_1c': 'R$ {:,.2f}', 'v_falta': 'R$ {:,.2f}', 'perc_u': '{:.4f}%'}), 
         use_container_width=True, hide_index=True, height=450
     )
 
