@@ -110,32 +110,70 @@ try:
     with k3: st.markdown(f'<div class="card-neon"><div class="label-neon">Volume Falta</div><div class="value-neon">{int(vfal):,}</div><div class="sub-neon">Itens Pendentes</div></div>', unsafe_allow_html=True)
     with k4: st.markdown(f'<div class="card-neon"><div class="label-neon">Evolução</div><div class="value-neon">{concl:.1f}%</div><div class="p-bar-bg"><div class="p-bar-fill" style="width:{concl}%"></div></div></div>', unsafe_allow_html=True)
 
-   # --- SEÇÃO 1: GRÁFICO DE SAÚDE POR CD (LARGURA TOTAL) ---
+   # --- SEÇÃO 1: GRÁFICOS DO MEIO (BARRAS + SAÚDE TREEMAP) ---
     st.markdown("<br>", unsafe_allow_html=True)
-    st.subheader("🏢 Visão Geral de Saúde por CD")
     
-    df_tree = df_filt[df_filt['v_1c'] != 0].copy()
-    df_tree['cd'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-    
-    fig_t = px.treemap(
-        df_tree, 
-        path=['divisional', 'cd'], 
-        values=df_tree['v_1c'].abs(), 
-        color='v_1c', 
-        color_continuous_scale='Blues'
-    )
-    fig_t.update_layout(
-        template="plotly_dark", 
-        height=400, 
-        margin=dict(t=30, b=10, l=0, r=0), 
-        paper_bgcolor='rgba(0,0,0,0)'
-    )
-    st.plotly_chart(fig_t, use_container_width=True)
+    # Criamos duas colunas: uma para barras (1) e uma para saúde (1.2)
+    col_barras, col_saude = st.columns([1, 1.2])
+
+    with col_barras:
+        st.subheader("📊 Top 10 CDs por Perda")
+        
+        # Filtra apenas os CDs que têm movimento
+        df_top_cd = df_filt[df_filt['v_1c'] != 0].copy()
+        
+        # Converte CD para string limpa para ordenação correta no eixo
+        df_top_cd['cd'] = df_top_cd['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
+        
+        # Agrupa e pega o Top 10 (maiores perdas = valores mais negativos)
+        df_grouped_cd = df_top_cd.groupby(['divisional', 'cd'])['v_1c'].sum().nsmallest(10).reset_index()
+        
+        # Gráfico de Barras (Barras negativas para baixo)
+        fig_b = px.bar(
+            df_grouped_cd, 
+            x='cd', 
+            y='v_1c', 
+            color='v_1c',
+            labels={'v_1c': 'Perda R$', 'cd': 'CD'},
+            color_continuous_scale='Blues_r'
+        )
+        fig_b.update_layout(
+            template="plotly_dark", 
+            height=400, 
+            margin=dict(t=30, b=0, l=0, r=0), 
+            paper_bgcolor='rgba(0,0,0,0)',
+            xaxis={'tickangle': 0},
+            coloraxis_showscale=False # Esconde a barra de cores lateral
+        )
+        st.plotly_chart(fig_b, use_container_width=True)
+
+    with col_saude:
+        st.subheader("🏢 Saúde por CD (YoY)")
+        
+        df_tree = df_filt[df_filt['v_1c'] != 0].copy()
+        df_tree['cd'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
+        
+        # Gráfico Treemap (Hierárquico)
+        fig_t = px.treemap(
+            df_tree, 
+            path=['divisional', 'cd'], 
+            values=df_tree['v_1c'].abs(), 
+            color='v_1c', 
+            color_continuous_scale='RdBu_r' # Usando RdBu para destacar ganhos/perdas
+        )
+        fig_t.update_layout(
+            template="plotly_dark", 
+            height=400, 
+            margin=dict(t=30, b=10, l=0, r=0), 
+            paper_bgcolor='rgba(0,0,0,0)'
+        )
+        fig_t.update_traces(textinfo="label+value")
+        st.plotly_chart(fig_t, use_container_width=True)
 
     # --- SEÇÃO 2: TABELA (ESQUERDA) + PIZZA (DIREITA) ---
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Criamos duas colunas: uma larga para a tabela (2.5) e uma estreita para a pizza (1)
+    # Mantemos a estrutura de colunas [2.5, 1] que criamos antes
     col_tab, col_graf = st.columns([2.5, 1])
 
     with col_tab:
@@ -147,7 +185,6 @@ try:
         df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd', 'local', 'v_1c', '%', 'v_fal', 'is_fin']]
 
         def styler(row):
-            # Pintura total da linha: Vermelho para perda, Verde para ganho
             bg = 'background-color: #451a1a;' if row['v_1c'] < 0 else 'background-color: #1a4523;'
             return [bg] * len(row)
 
@@ -157,15 +194,15 @@ try:
                 "v_1c": st.column_config.NumberColumn("Resultado", format="R$ %.2f"),
                 "%": st.column_config.NumberColumn("%", format="%.4f%%"),
                 "v_fal": st.column_config.NumberColumn("Falta", format="%.0f"),
-                "is_fin": "Fim?"
+                "is_fin": st.column_config.CheckboxColumn("Fim?")
             }, 
             use_container_width=True, 
             hide_index=True,
-            height=500 # Altura fixa para alinhar com o gráfico lateral
+            height=500 
         )
 
     with col_graf:
-        st.subheader("📍 Perda por Gerência")
+        st.subheader("📍 Perda / Gerência")
         df_p = df_filt[df_filt['divisional'] != "Indefinido"]
         
         fig_p = px.pie(
@@ -177,7 +214,7 @@ try:
         )
         fig_p.update_layout(
             template="plotly_dark", 
-            height=500, # Mesma altura da tabela
+            height=500, 
             margin=dict(t=50, b=50, l=0, r=0), 
             paper_bgcolor='rgba(0,0,0,0)',
             showlegend=True,
