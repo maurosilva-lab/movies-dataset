@@ -28,7 +28,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- CARGA E LIMPEZA ---
 @st.cache_data(ttl=60)
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1iaHnigQGOH5w4xFlZXN0cXYSZlLqPuHE1Pdsgy0XSdI/export?format=csv&gid=1358149674"
@@ -46,12 +45,11 @@ def to_num(v):
 try:
     df_raw = load_data().copy()
     
-    # Mapeamento de colunas (Regex para evitar erro de nome)
+    # Mapeamento e limpeza pesada
     c_1c = next((c for c in df_raw.columns if '1' in c and 'ciclo' in c), None)
     c_falta = next((c for c in df_raw.columns if 'falta' in c and 'vol' in c), None)
     c_fat = next((c for c in df_raw.columns if 'faturamento' in c or 'fat' in c), None)
     
-    # Criando colunas numéricas puras
     df_raw['v_1c'] = df_raw[c_1c].apply(to_num).astype(float) if c_1c else 0.0
     df_raw['v_falta'] = df_raw[c_falta].apply(to_num).astype(float) if c_falta else 0.0
     df_raw['v_fat'] = df_raw[c_fat].apply(to_num).astype(float) if c_fat else 0.0
@@ -59,7 +57,7 @@ try:
     df_raw['cd_t'] = df_raw['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
     df_raw['is_fin'] = df_raw['v_1c'] != 0
 
-    # --- FILTROS SIDEBAR ---
+    # --- SIDEBAR (FILTROS RESTAURADOS) ---
     with st.sidebar:
         st.header("⚙️ Filtros")
         if st.button("🔄 Atualizar Dados"): st.cache_data.clear(); st.rerun()
@@ -106,26 +104,25 @@ try:
         fig_t.update_layout(template="plotly_dark", height=350, margin=dict(t=0,b=0,l=0,r=0))
         st.plotly_chart(fig_t, use_container_width=True)
 
-    # --- TABELA SEM ERRO DE COMPARAÇÃO ---
+    # --- TABELA FINAL (SEM COMPARAÇÃO LÓGICA NO STYLER) ---
     st.markdown("**Detalhamento Operacional**")
     df_tab = df_filt.copy()
     df_tab['%'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
     
-    # TRUQUE SÊNIOR: Criamos uma coluna booleana. O Styler vai ler True/False, não números.
-    df_tab['is_negative'] = df_tab['v_1c'] < 0
+    # PRÉ-CÁLCULO DAS CORES: Aqui a gente resolve o erro antes de mandar pra tabela
+    # Criamos uma coluna de string com o código da cor
+    df_tab['cor_fundo'] = df_tab['v_1c'].apply(lambda x: '#451a1a' if x < 0 else '#1a4523')
     
-    df_show = df_tab[['tipo_clean', 'cd_t', 'local', 'v_1c', '%', 'v_falta', 'is_negative']].reset_index(drop=True)
+    df_show = df_tab[['tipo_clean', 'cd_t', 'local', 'v_1c', '%', 'v_falta', 'cor_fundo']].reset_index(drop=True)
 
-    def apply_color(row):
-        # A lógica agora olha para 'is_negative' que é booleano estável
-        bg = '#451a1a' if row['is_negative'] else '#1a4523'
-        return [f'background-color: {bg}'] * len(row)
+    # Função Sênior: Apenas retorna o valor da coluna 'cor_fundo' já calculada
+    def apply_static_color(row):
+        return [f"background-color: {row['cor_fundo']}"] * len(row)
 
-    # Exibimos a tabela escondendo a coluna de controle 'is_negative'
     st.dataframe(
-        df_show.style.apply(apply_color, axis=1)
+        df_show.style.apply(apply_static_color, axis=1)
         .format({'v_1c': 'R$ {:,.2f}', 'v_falta': 'R$ {:,.2f}', '%': '{:.4f}%'}),
-        column_config={"is_negative": None}, # Esconde a coluna de controle
+        column_config={"cor_fundo": None}, # Esconde a coluna de cores do usuário
         use_container_width=True, hide_index=True
     )
 
