@@ -7,7 +7,6 @@ import re
 st.set_page_config(layout="wide", page_title="Prevenção | BI Executive", page_icon="📊")
 
 # --- ESTILIZAÇÃO CSS (Big Numbers + 6 Cards) ---
-# --- ESTILIZAÇÃO CSS (Big Numbers + Cards) ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
@@ -16,8 +15,10 @@ st.markdown("""
     .header-box {
         background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
         padding: 1rem; border-radius: 0 0 15px 15px; text-align: center;
-        margin-bottom: 0rem; /* <-- AQUI FOI ZERADO PARA SUBIR OS CARDS */
+        margin-bottom: 0px !important; 
         box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
+        position: relative;
+        z-index: 99; /* Garante que o título fique por cima visualmente */
     }
     .header-title { color: white !important; font-size: 26px !important; font-weight: 800 !important; margin:0; }
 
@@ -30,9 +31,10 @@ st.markdown("""
     .value-kpi { color: #f0f6fc; font-size: 26px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; }
     .sub-kpi { color: #00d2ff; font-size: 12px; font-weight: 500; }
 
-    /* Força os blocos do Streamlit a terem menos espaço vertical entre eles */
-    div[data-testid="column"] {
-        margin-top: -10px; /* Puxa levemente os cards para cima */
+    /* --- O SEGREDO PARA TIRAR O ESPAÇO --- */
+    /* Isso pega a primeira linha de colunas (que são os seus cards) e puxa 40 pixels pra cima! */
+    div[data-testid="stHorizontalBlock"]:first-of-type {
+        margin-top: -40px !important;
     }
     </style>
 """, unsafe_allow_html=True)
