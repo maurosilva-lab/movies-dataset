@@ -82,10 +82,14 @@ try:
     with st.sidebar:
         st.header("⚙️ Gerenciamento")
         if st.button("🔄 Atualizar Dados"): st.cache_data.clear(); st.rerun()
+        
+        # Filtros adicionados: Semestre, Tipo e Gerente
+        s_sel = st.multiselect("Filtrar Semestre", options=sorted(df_raw['semestre'].dropna().unique())) if 'semestre' in df_raw.columns else []
         t_sel = st.multiselect("Filtrar por Tipo", options=sorted(df_raw['tipo_clean'].unique()))
         d_sel = st.multiselect("Filtrar Gerente", options=sorted([x for x in df_raw['divisional'].unique() if x != "Indefinido"]))
 
     df_filt = df_raw.copy()
+    if s_sel: df_filt = df_filt[df_filt['semestre'].isin(s_sel)]
     if t_sel: df_filt = df_filt[df_filt['tipo_clean'].isin(t_sel)]
     if d_sel: df_filt = df_filt[df_filt['divisional'].isin(d_sel)]
 
@@ -100,8 +104,6 @@ try:
     
     perc_falta = (vfal / perda_total * 100) if perda_total != 0 else 0
     perc_geral_perdas = (perda_total / vfat_total * 100) if vfat_total != 0 else 0
-    
-    # Formatação do percentual para o padrão "-0,039%"
     perc_geral_str = f"{perc_geral_perdas:.3f}".replace('.', ',') + "%"
     
     total_uds = len(df_filt)
@@ -109,30 +111,57 @@ try:
     pendentes = total_uds - fechadas
     target_pos = 70
 
+    # --- CÁLCULO DINÂMICO DE COMPARAÇÃO COM 2025 ---
+    dados_2025 = pd.DataFrame([
+        {'tipo': 'CD', 'semestre': '1º semestre', 'valor': 9415271},
+        {'tipo': 'CD', 'semestre': '2º semestre', 'valor': 5379088},
+        {'tipo': 'CROSS', 'semestre': '1º semestre', 'valor': 2183},
+        {'tipo': 'CROSS', 'semestre': '2º semestre', 'valor': 1633},
+        {'tipo': 'DQS', 'semestre': '1º semestre', 'valor': 269835},
+        {'tipo': 'DQS', 'semestre': '2º semestre', 'valor': -268613},
+        {'tipo': 'LV', 'semestre': '1º semestre', 'valor': 619830},
+        {'tipo': 'LV', 'semestre': '2º semestre', 'valor': 2509390}
+    ])
+
+    tipos_presentes = df_filt['tipo_clean'].unique()
+    
+    if 'semestre' in df_filt.columns:
+        semestres_presentes = df_filt['semestre'].astype(str).str.lower().str.strip().unique()
+        dados_2025['semestre_clean'] = dados_2025['semestre'].str.lower().str.strip()
+        df_2025_filt = dados_2025[(dados_2025['tipo'].isin(tipos_presentes)) & (dados_2025['semestre_clean'].isin(semestres_presentes))]
+    else:
+        df_2025_filt = dados_2025[dados_2025['tipo'].isin(tipos_presentes)]
+
+    perda_2025_abs = df_2025_filt['valor'].sum()
+    perda_total_abs = abs(perda_total)
+    
+    if perda_2025_abs != 0:
+        var_perc = ((perda_total_abs - perda_2025_abs) / abs(perda_2025_abs)) * 100
+    else:
+        var_perc = 0
+
+    if var_perc < 0:
+        texto_var = f'<span style="color:#3fb950; font-weight:bold;">▼ {abs(var_perc):.1f}% (Redução)</span> vs 2025'
+    elif var_perc > 0:
+        texto_var = f'<span style="color:#ff4b4b; font-weight:bold;">▲ {var_perc:.1f}% (Aumento)</span> vs 2025'
+    else:
+        texto_var = "Igual a 2025"
+
+
     # 6 CARDS KPI 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     
     with c1: 
-        # Define o valor do ano anterior
-        perda_2025 = -17928616
-        
-        # Calcula a variação percentual: (Atual - Anterior) / |Anterior| * 100
-        var_perc = ((perda_total - perda_2025) / abs(perda_2025)) * 100 if perda_2025 != 0 else 0
-        
-        # Coloca um sinal de "+" na frente se a variação for positiva para melhor visualização
-        sinal = "+" if var_perc > 0 else ""
-        
         st.markdown(f'''
         <div class="card-kpi">
             <div class="label-kpi">Perda Consolidada</div>
             <div class="value-kpi">R$ {perda_total:,.0f}</div>
-            <div class="sub-kpi">vs 2025: {sinal}{var_perc:.1f}%</div>
+            <div class="sub-kpi">{texto_var}</div>
         </div>
         ''', unsafe_allow_html=True)
     with c2: 
         st.markdown(f'<div class="card-kpi"><div class="label-kpi">Falta Volume</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">{abs(perc_falta):.1f}% da Perda</div></div>', unsafe_allow_html=True)
     with c3: 
-        # Retorna ao formato original (sobre faturamento)
         st.markdown(f'''
         <div class="card-kpi">
             <div class="label-kpi">% Geral de Perdas</div>
@@ -140,14 +169,9 @@ try:
             <div class="sub-kpi">Sobre Faturamento</div>
         </div>
         ''', unsafe_allow_html=True)
-    
     with c4: 
-        # Calcula a porcentagem de finalizadas em relação ao total
         perc_finalizadas = (fechadas / total_uds * 100) if total_uds > 0 else 0
-        
-        # Adiciona a porcentagem no sub-kpi (ou você pode colocar junto ao {total_uds} se preferir)
         st.markdown(f'<div class="card-kpi"><div class="label-kpi">Total Unidades</div><div class="value-kpi">{total_uds}</div><div class="sub-kpi">{perc_finalizadas:.1f}% Finalizadas</div></div>', unsafe_allow_html=True)
-        
     with c5:
         pf = (fechadas/total_uds*100) if total_uds > 0 else 0
         st.markdown(f'''<div class="card-kpi"><div class="label-kpi">Finalizadas</div><div class="target-container"><div class="target-fill" style="width:{pf}%;"></div><div class="target-line" style="left:{target_pos}%;"></div><div class="target-text">{fechadas}</div></div>
