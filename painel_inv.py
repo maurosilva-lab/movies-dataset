@@ -64,18 +64,23 @@ try:
     df_raw = load_data().copy()
 
     # Sidebar
-    with st.sidebar:
-        st.header("⚙️ Gerenciamento")
-        if st.button("🔄 Atualizar Dados"):
+    # Sidebar - Filtros com tratamento 'inline' para evitar erro de float vs str
+    st.header("⚙️ Gerenciamento")
+    if st.button("🔄 Atualizar Dados"):
             st.cache_data.clear()
             st.rerun()
-        st.divider()
+    st.divider()
         
-        df_raw['tipo_clean'] = df_raw['tipo'].str.upper().str.strip()
-        df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional)
+        # Garante que as colunas de apoio sejam string ANTES do unique/sorted
+    df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
+    df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional).astype(str)
         
-        tipos_sel = st.multiselect("Tipo", options=sorted(df_raw['tipo_clean'].unique()))
-        divs_sel = st.multiselect("Divisional", options=sorted(df_raw['divisional'].unique()))
+        # Filtros blindados contra tipos mistos
+    opcoes_tipo = sorted([str(x) for x in df_raw['tipo_clean'].unique() if x != ''])
+    tipos_sel = st.multiselect("Tipo", options=opcoes_tipo)
+        
+    opcoes_div = sorted([str(x) for x in df_raw['divisional'].unique()])
+    divs_sel = st.multiselect("Divisional", options=opcoes_div)
 
     # Localização Dinâmica de Colunas
     def get_col(name_snippet):
