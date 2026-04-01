@@ -214,41 +214,10 @@ try:
         df_tab = df_filt.copy()
         df_tab['%'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
         df_tab['cd_t'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-        
-        # Seleciona as colunas
         df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd_t', 'local', 'v_1c', '%', 'v_falta', 'is_fin']]
-        
-        # Renomeia as colunas para maiúsculo conforme solicitado (e padroniza as demais)
-        df_ex = df_ex.rename(columns={
-            'semestre': 'SEMESTRE',
-            'tipo_clean': 'TIPO',
-            'divisional': 'GERENTE',
-            'cd_t': 'UNIDADES',
-            'local': 'LOCAL',
-            'v_1c': '$RESULTADO',
-            '%': '%PERDAS',
-            'v_falta': 'FALTA VOL.',
-            'is_fin': 'FINALIZADA'
-        })
-        
-        # Aplica a cor de fundo (agora verificando a nova coluna '$RESULTADO')
-        estilo_tabela = df_ex.style.apply(
-            lambda r: ['background-color: #451a1a' if r['$RESULTADO'] < 0 else 'background-color: #1a4523'] * len(r), 
-            axis=1
-        )
-        
-        # Plota a tabela atualizando o column_config com as chaves renomeadas
-        st.dataframe(
-            estilo_tabela,
-            column_config={
-                "$RESULTADO": st.column_config.NumberColumn("$RESULTADO", format="R$ %.2f"), 
-                "%PERDAS": st.column_config.NumberColumn("%PERDAS", format="%.3f%%"), 
-                "FALTA VOL.": st.column_config.NumberColumn("FALTA VOL.", format="%.0f")
-            },
-            use_container_width=True, 
-            hide_index=True, 
-            height="content"
-        )
+        st.dataframe(df_ex.style.apply(lambda r: ['background-color: #451a1a' if r['v_1c'] < 0 else 'background-color: #1a4523']*len(r), axis=1),
+                     column_config={"v_1c": st.column_config.NumberColumn("Resultado", format="R$ %.2f"), "%": st.column_config.NumberColumn("%", format="%.3f%%"), "v_falta": st.column_config.NumberColumn("Falta", format="%.0f")},
+                     use_container_width=True, hide_index=True, height="content")
     with b2:
         st.subheader("📍 Perda / Gerente")
         df_pi = df_filt[df_filt['divisional'] != "Indefinido"]
