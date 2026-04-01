@@ -6,109 +6,105 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
-# --- CSS DEFINITIVO (FORÇANDO ESTILO NEON) ---
+# --- ESTILIZAÇÃO CSS ATUALIZADA (EXECUTIVE NEON v3) ---
 st.markdown("""
     <style>
-    /* Fundo e Container */
-    [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
-    .main { padding: 0rem !important; }
+    [data-testid="stAppViewContainer"] { background-color: #0d1117; }
+    .block-container { padding-top: 2rem !important; max-width: 95%; }
     
-    /* Header Custom */
+    /* TÍTULO COM GRADIENTE */
     .header-box {
-        background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
-        padding: 1.5rem; border-radius: 0 0 15px 15px; text-align: center;
-        margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
+        background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
+        padding: 15px; border-radius: 12px; text-align: center;
+        margin-bottom: 30px; box-shadow: 0 4px 20px rgba(0, 210, 255, 0.2);
     }
-    .header-title { color: white !important; font-size: 28px !important; font-weight: 800 !important; margin:0; }
+    .header-title { color: white; font-size: 28px; font-weight: 800; letter-spacing: 2px; margin:0; }
 
-    /* Estilo dos Cards KPI */
-    div[data-testid="stMetric"] {
-        background-color: #161b22 !important;
-        border: 1px solid #30363d !important;
-        border-radius: 12px !important;
-        padding: 15px !important;
-    }
-    
-    .card-neon {
+    /* CARDS ESTILO NEON */
+    .card-kpi {
         background: #161b22; border: 1px solid #30363d;
-        border-radius: 12px; padding: 20px; text-align: center;
-        min-height: 140px; border-bottom: 3px solid #00d2ff;
+        border-radius: 15px; padding: 25px; text-align: center;
+        transition: transform 0.3s;
+        min-height: 160px;
     }
-    .label-neon { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; }
-    .value-neon { color: #f0f6fc; font-size: 24px; font-weight: 800; margin: 5px 0; }
-    .sub-neon { color: #00d2ff; font-size: 12px; font-weight: 500; }
-
-    /* Progress Bar */
-    .p-bar-bg { background-color: #30363d; border-radius: 5px; height: 6px; width: 100%; margin-top: 10px; }
-    .p-bar-fill { background: #00d2ff; height: 6px; border-radius: 5px; box-shadow: 0 0 8px #00d2ff; }
+    .card-kpi:hover { transform: translateY(-5px); border-color: #00d2ff; }
+    
+    /* TEXTOS DENTRO DOS CARDS */
+    .label-kpi { color: #8b949e; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 10px; }
+    .value-kpi { color: #f0f6fc; font-size: 28px; font-weight: 800; }
+    .sub-kpi { color: #00d2ff; font-size: 14px; margin-top: 8px; font-weight: 500; }
+    
+    /* BARRA DE PROGRESSO CUSTOM (PARA O CARD EVOLUÇÃO) */
+    .progress-bg { background-color: #30363d; border-radius: 10px; height: 10px; width: 100%; margin-top: 20px; }
+    .progress-fill { 
+        background: linear-gradient(90deg, #00d2ff 0%, #00f2ff 100%); 
+        height: 10px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 242, 255, 0.5); 
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES ---
-def limpar_valor(v):
-    if pd.isna(v) or str(v).strip() in ["", "-", "nan"]: return 0.0
-    val = str(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
-    val = re.sub(r'[^0-9\.\-]', '', val)
-    try: return float(val)
-    except: return 0.0
+# ... (Mantenha as funções limpar_valor, mapear_divisional e load_data iguaizinhas) ...
 
-def mapear_divisional(cd):
-    if pd.isna(cd) or str(cd).strip() in ["", "nan", "0"]: return "Indefinido"
-    try:
-        n_cd = int(re.sub(r'\D', '', str(cd).split('.')[0]))
-    except: return "Indefinido"
-    if n_cd in [590, 300, 50]: return 'Renato Nesello'
-    elif n_cd in [2650, 994, 991, 1100, 1500, 1800, 1250]: return 'Antônio Paiva'
-    elif n_cd in [350, 5200, 2900, 94, 490, 550, 2500, 1440]: return 'Christian'
-    elif n_cd in [204, 2489, 97, 549, 2599, 1116, 1889, 389, 1879, 299, 1899, 2989, 5589, 1450, 49, 2999, 2099, 985, 93, 5289, 5299, 2649, 893, 5599, 1869, 1390]: return 'Mileide'
-    return 'Outros'
+# ... (Início do bloco try, carregamento de dados e sidebar permanecem iguais) ...
 
-@st.cache_data(ttl=300)
-def load_data():
-    url = f"https://docs.google.com/spreadsheets/d/1iaHnigQGOH5w4xFlZXN0cXYSZlLqPuHE1Pdsgy0XSdI/export?format=csv&gid=1358149674"
-    df = pd.read_csv(url).dropna(how='all')
-    df.columns = [re.sub(r'[^a-zA-Z0-9]', '_', str(c).strip().lower()) for c in df.columns]
-    return df
+    # 3. Processamento Numérico
+    def get_col(name_snippet):
+        match = [c for c in df_raw.columns if name_snippet in c]
+        return match[0] if match else None
 
-try:
-    df_raw = load_data().copy()
-    
-    # Sidebar
-    with st.sidebar:
-        st.header("⚙️ Filtros")
-        if st.button("🔄 Atualizar"): st.cache_data.clear(); st.rerun()
-        df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
-        df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional)
-        t_sel = st.multiselect("Tipo", options=sorted(df_raw['tipo_clean'].unique()))
-        d_sel = st.multiselect("Divisional", options=sorted([x for x in df_raw['divisional'].unique() if x != "Indefinido"]))
+    c_fat = get_col('faturamento')
+    c_1c = get_col('1__ciclo')
+    c_falta = get_col('falta_vol') # Esta é a coluna de Volume de Falta
 
-    # Dados
-    c_1c = next((c for c in df_raw.columns if '1__ciclo' in c), None)
-    c_fat = next((c for c in df_raw.columns if 'faturamento' in c), None)
-    c_fal = next((c for c in df_raw.columns if 'falta_vol' in c), None)
+    df_raw['v_1c'] = df_raw[c_1c].apply(limpar_valor) if c_1c else 0.0
+    df_raw['v_fat'] = df_raw[c_fat].apply(limpar_valor) if c_fat else 0.0
+    df_raw['v_falta'] = df_raw[c_falta].apply(limpar_valor) if c_falta else 0.0 # Valor em R$ da falta
+    df_raw['is_finalizado'] = df_raw['v_1c'] != 0
 
-    df_raw['v_1c'] = df_raw[c_1c].apply(limpar_valor)
-    df_raw['v_fat'] = df_raw[c_fat].apply(limpar_valor)
-    df_raw['v_fal'] = df_raw[c_fal].apply(limpar_valor)
-    df_raw['is_fin'] = df_raw['v_1c'] != 0
+    # Aplicação de Filtros (continua igual)
+    # ...
 
-    df_filt = df_raw.copy()
-    if t_sel: df_filt = df_filt[df_filt['tipo_clean'].isin(t_sel)]
-    if d_sel: df_filt = df_filt[df_filt['divisional'].isin(d_sel)]
-
-    # --- UI ---
+    # --- UI PRINCIPAL - REVISADA ---
     st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO MAGALOG 2026</p></div>', unsafe_allow_html=True)
 
-    # Cards
-    p1c = df_filt['v_1c'].sum(); vfal = df_filt['v_fal'].sum(); fat = df_filt['v_fat'].sum()
-    p_glob = (abs(p1c + vfal)/fat*100) if fat > 0 else 0
-    concl = (df_filt['is_fin'].sum()/len(df_filt)*100) if len(df_filt)>0 else 0
+    # Cálculos KPIs
+    perda_1c = df_filt['v_1c'].sum()
+    falta_vol = df_filt['v_falta'].sum()
+    fat_total = df_filt['v_fat'].sum()
+    
+    # 1. Perda Consolidada (Base para o cálculo de porcentagem)
+    perda_consolidada = perda_1c + falta_vol
+    
+    # 2. % Perda Global sobre faturamento
+    perc_global = (abs(perda_consolidada) / fat_total * 100) if fat_total > 0 else 0.0
+    
+    # 3. NOVO CÁLCULO: Porcentagem do Volume de Falta sobre a Perda Consolidada TOTAL
+    if perda_consolidada != 0:
+        perc_falta_sobre_total = (falta_vol / perda_consolidada * 100)
+    else:
+        perc_falta_sobre_total = 0.0
+        
+    # 4. Evolução / Conclusão
+    total_un = len(df_filt)
+    finalizados = df_filt['is_finalizado'].sum()
+    perc_conclusao = (finalizados / total_un * 100) if total_un > 0 else 0
 
+    # Renderização dos Cards KPIs revisados
     k1, k2, k3, k4 = st.columns(4)
-    with k1: st.markdown(f'<div class="card-neon"><div class="label-neon">Perda Consolidada</div><div class="value-neon">R$ {p1c+vfal:,.0f}</div><div class="sub-neon">1C + Falta Vol</div></div>', unsafe_allow_html=True)
-    with k2: st.markdown(f'<div class="card-neon"><div class="label-neon">% Perda Geral</div><div class="value-neon">{p_glob:.3f}%</div><div class="sub-neon">Sobre Faturamento</div></div>', unsafe_allow_html=True)
-    with k3: st.markdown(f'<div class="card-neon"><div class="label-neon">Falta Volume</div><div class="value-neon">{int(vfal):,}</div><div class="sub-neon">Itens Pendentes</div></div>', unsafe_allow_html=True)
-    with k4: st.markdown(f'<div class="card-neon"><div class="label-neon">Evolução</div><div class="value-neon">{concl:.1f}%</div><div class="p-bar-bg"><div class="p-bar-fill" style="width:{concl}%"></div></div></div>', unsafe_allow_html=True)
+    with k1:
+        st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consolidada</div><div class="value-kpi">R$ {perda_consolidada:,.0f}</div><div class="sub-kpi">1C + Falta Vol (Financeiro)</div></div>', unsafe_allow_html=True)
+    with k2:
+        st.markdown(f'<div class="card-kpi"><div class="label-kpi">% Perda Global</div><div class="value-kpi">{perc_global:.3f}%</div><div class="sub-kpi">Sobre Faturamento</div></div>', unsafe_allow_html=True)
+    with k3:
+        # ALTERAÇÃO SOLICITADA: Mostra a porcentagem sobre o total de perdas, remove "itens pendentes"
+        st.markdown(f'<div class="card-kpi"><div class="label-kpi">Volume Falta</div><div class="value-kpi">R$ {falta_vol:,.0f}</div><div class="sub-kpi">{perc_falta_sobre_total:.1f}% da Perda Total</div></div>', unsafe_allow_html=True)
+    with k4:
+        # ALTERAÇÃO SOLICITADA: Barra de progresso neon inspirada no print
+        st.markdown(f'''<div class="card-kpi"><div class="label-kpi">Evolução / Conclusão</div><div class="value-kpi">{perc_conclusao:.1f}%</div>
+        <div class="progress-bg"><div class="progress-fill" style="width: {perc_conclusao}%"></div></div></div>''', unsafe_allow_html=True)
+
+# ... (Mantenha a seção do comparativo YoY e os gráficos iguaizinhas) ...
+
 # --- SEÇÃO 1: GRÁFICOS DO MEIO (RESULTADO CONSOLIDADO + TREEMAP) ---
     st.markdown("<br>", unsafe_allow_html=True)
     
