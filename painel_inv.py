@@ -7,6 +7,7 @@ import re
 st.set_page_config(layout="wide", page_title="Prevenção | BI Executive", page_icon="📊")
 
 # --- ESTILIZAÇÃO CSS (Big Numbers + 6 Cards) ---
+# --- ESTILIZAÇÃO CSS (Big Numbers + Cards) ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
@@ -18,7 +19,7 @@ st.markdown("""
         margin-bottom: 0px !important; 
         box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
         position: relative;
-        z-index: 99; /* Garante que o título fique por cima visualmente */
+        z-index: 99;
     }
     .header-title { color: white !important; font-size: 26px !important; font-weight: 800 !important; margin:0; }
 
@@ -26,16 +27,11 @@ st.markdown("""
         background: #161b22; border: 1px solid #30363d;
         border-radius: 12px; padding: 15px; text-align: center;
         border-bottom: 4px solid #00d2ff;
+        margin-top: -35px; /* <-- TRUQUE SEGURO: Move apenas a caixinha visual do card para cima! */
     }
     .label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
     .value-kpi { color: #f0f6fc; font-size: 26px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; }
     .sub-kpi { color: #00d2ff; font-size: 12px; font-weight: 500; }
-
-    /* --- O SEGREDO PARA TIRAR O ESPAÇO --- */
-    /* Isso pega a primeira linha de colunas (que são os seus cards) e puxa 40 pixels pra cima! */
-    div[data-testid="stHorizontalBlock"]:first-of-type {
-        margin-top: -40px !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
