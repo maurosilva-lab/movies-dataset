@@ -6,32 +6,42 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
-# --- CSS (Estilo do Print com Ajuste de Cards) ---
+# --- CSS (Ajuste de Topo e Estilo Executivo) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] { display: none; }
-    .block-container { padding-top: 0rem !important; margin-top: -45px !important; }
+    .block-container { padding-top: 1.5rem !important; margin-top: -30px !important; }
     [data-testid="stAppViewContainer"] { background-color: #0b0e14 !important; }
     
     .header-box {
         background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-        padding: 10px; border-radius: 5px; text-align: center;
+        padding: 12px; border-radius: 5px; text-align: center;
         margin-bottom: 20px; border-bottom: 3px solid #00d2ff;
     }
-    .header-title { color: white !important; font-size: 24px !important; font-weight: 800 !important; letter-spacing: 2px; }
+    .header-title { color: white !important; font-size: 26px !important; font-weight: 800 !important; letter-spacing: 2px; }
 
     .card-kpi {
         background: #1c222d; border: 1px solid #313d4f; border-radius: 10px;
         padding: 15px; text-align: center; border-top: 3px solid #00d2ff;
-        min-height: 100px;
+        min-height: 110px;
     }
     .value-kpi { color: white; font-size: 22px; font-weight: 900; margin: 0; }
     .label-kpi { color: #8b949e; font-size: 11px; text-transform: uppercase; margin-bottom: 5px; }
-    .sub-value { color: #00d2ff; font-size: 13px; font-weight: 700; }
+    .sub-value { color: #00d2ff; font-size: 12px; font-weight: 700; margin-top: 5px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- ENGINE DE DADOS ---
+# --- ENGINE DE LIMPEZA DE DADOS SÊNIOR ---
+def universal_clean(v):
+    if pd.isna(v) or str(v).strip() in ["", "-", "nan", "None", "#DIV/0!"]: return 0.0
+    s = str(v).replace('R$', '').replace('%', '').replace(' ', '')
+    # Trata separadores: remove ponto de milhar e troca vírgula por ponto decimal
+    if ',' in s and '.' in s: s = s.replace('.', '').replace(',', '.')
+    elif ',' in s: s = s.replace(',', '.')
+    s = re.sub(r'[^0-9\.\-]', '', s)
+    try: return float(s)
+    except: return 0.0
+
 @st.cache_data(ttl=60)
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1iaHnigQGOH5w4xFlZXN0cXYSZlLqPuHE1Pdsgy0XSdI/export?format=csv&gid=1358149674"
@@ -39,99 +49,96 @@ def load_data():
     df.columns = [re.sub(r'[^a-zA-Z0-9]', '_', str(c).strip().lower()) for c in df.columns]
     return df
 
-def limpar_valor(v):
-    if pd.isna(v) or str(v).strip() in ["", "-", "nan"]: return 0.0
-    val = str(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
-    val = re.sub(r'[^0-9\.\-]', '', val)
-    try: return float(val)
-    except: return 0.0
-
 try:
     df_raw = load_data().copy()
     
-    # Mapeamento de colunas financeiras originais
-    df_raw['v_1c'] = df_raw['1__ciclo'].apply(limpar_valor) if '1__ciclo' in df_raw.columns else 0.0
-    df_raw['v_falta'] = df_raw['falta_vol'].apply(limpar_valor) if 'falta_vol' in df_raw.columns else 0.0
-    df_raw['v_fat'] = df_raw['faturamento'].apply(limpar_valor) if 'faturamento' in df_raw.columns else 0.0
-    df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper()
+    # Mapeamento e Sanitização Atômica
+    c_1c = next((c for c in df_raw.columns if '1' in c and 'ciclo' in c), None)
+    c_falta = next((c for c in df_raw.columns if 'falta' in c and 'vol' in c), None)
+    c_fat = next((c for c in df_raw.columns if 'faturamento' in c or 'fat' in c), None)
+    c_ger = next((c for c in df_raw.columns if 'divisional' in c or 'ger' in c), None)
+
+    df_raw['v_1c'] = df_raw[c_1c].apply(universal_clean).astype(float) if c_1c else 0.0
+    df_raw['v_falta'] = df_raw[c_falta].apply(universal_clean).astype(float) if c_falta else 0.0
+    df_raw['v_fat'] = df_raw[c_fat].apply(universal_clean).astype(float) if c_fat else 0.0
+    
+    df_raw['tipo_clean'] = df_raw['tipo'].fillna('OUTROS').astype(str).str.upper()
+    df_raw['cd_t'] = df_raw['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
     df_raw['is_fin'] = df_raw['v_1c'] != 0
 
-    # --- FILTROS SIDEBAR ---
+    # --- SIDEBAR (FILTROS RESTAURADOS) ---
     with st.sidebar:
-        st.markdown("### 📊 Gerenciamento")
+        st.header("⚙️ Painel de Controle")
         if st.button("🔄 Atualizar Dados"):
             st.cache_data.clear()
             st.rerun()
-        t_sel = st.multiselect("Tipo", options=sorted(df_raw['tipo_clean'].unique()))
+        f_tipo = st.multiselect("Filtrar Tipo", options=sorted(df_raw['tipo_clean'].unique()))
+        f_cd = st.multiselect("Filtrar CD", options=sorted(df_raw['cd_t'].unique()))
+        f_ger = st.multiselect("Filtrar Gerente", options=sorted(df_raw['divisional'].unique()) if 'divisional' in df_raw.columns else [])
 
     df_filt = df_raw.copy()
-    if t_sel: df_filt = df_filt[df_filt['tipo_clean'].isin(t_sel)]
+    if f_tipo: df_filt = df_filt[df_filt['tipo_clean'].isin(f_tipo)]
+    if f_cd: df_filt = df_filt[df_filt['cd_t'].isin(f_cd)]
+    if f_ger: df_filt = df_filt[df_filt['divisional'].isin(f_ger)]
 
-    # --- TÍTULO ---
+    # --- TÍTULO PRINCIPAL ---
     st.markdown('<div class="header-box"><p class="header-title">PAINEL FECHAMENTO MAGALOG 2026</p></div>', unsafe_allow_html=True)
 
-    # --- KPIS REESTRUTURADOS ---
-    v_1c = df_filt['v_1c'].sum()
-    v_falta = df_filt['v_falta'].sum()
-    v_perda_ano = v_1c + v_falta
+    # --- KPIS ---
+    v_1c_sum = df_filt['v_1c'].sum()
+    v_falta_sum = df_filt['v_falta'].sum()
+    v_perda_ano = v_1c_sum + v_falta_sum
     fat_total = df_filt['v_fat'].sum()
-    health_perc = (abs(v_perda_ano) / fat_total * 100) if fat_total > 0 else 0.0
+    perc_perda = (abs(v_perda_ano) / fat_total * 100) if fat_total > 0 else 0.0
     
-    total_un = len(df_filt)
-    fechadas = df_filt['is_fin'].sum()
-    pendentes = total_un - fechadas
+    t_un = len(df_filt); f_un = df_filt['is_fin'].sum()
 
     k1, k2, k3, k4, k5 = st.columns(5)
-    with k1: st.markdown(f'<div class="card-kpi"><p class="label-kpi">1º Ciclo</p><p class="value-kpi">R$ {v_1c:,.0f}</p></div>', unsafe_allow_html=True)
-    with k2: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Falta Vol</p><p class="value-kpi">R$ {v_falta:,.0f}</p></div>', unsafe_allow_html=True)
-    with k3: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Perda Ano</p><p class="value-kpi">R$ {v_perda_ano:,.0f}</p></div>', unsafe_allow_html=True)
-    with k4: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Health %</p><p class="value-kpi">{health_perc:.3f}%</p></div>', unsafe_allow_html=True)
-    with k5: 
-        # Card Unificado: Status das Unidades
-        st.markdown(f'''<div class="card-kpi"><p class="label-kpi">Status Unidades</p><p class="value-kpi">{total_un}</p>
-                    <p class="sub-value"><span style="color:#00d2ff">Fin: {fechadas}</span> | <span style="color:#ff4b4b">Pend: {pendentes}</span></p></div>''', unsafe_allow_html=True)
+    with k1: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Perda Ano</p><p class="value-kpi">R$ {v_perda_ano:,.0f}</p></div>', unsafe_allow_html=True)
+    with k2: st.markdown(f'<div class="card-kpi"><p class="label-kpi">1º Ciclo</p><p class="value-kpi">R$ {v_1c_sum:,.0f}</p></div>', unsafe_allow_html=True)
+    with k3: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Falta Vol</p><p class="value-kpi">R$ {v_falta_sum:,.0f}</p></div>', unsafe_allow_html=True)
+    with k4: st.markdown(f'<div class="card-kpi"><p class="label-kpi">% Perdas</p><p class="value-kpi">{perc_perda:.3f}%</p></div>', unsafe_allow_html=True)
+    with k5: st.markdown(f'''<div class="card-kpi"><p class="label-kpi">Status Unidades</p><p class="value-kpi">{t_un}</p>
+                    <p class="sub-value"><span style="color:#00d2ff">Fin: {f_un}</span> | <span style="color:#ff4b4b">Pend: {t_un-f_un}</span></p></div>''', unsafe_allow_html=True)
 
-    # --- GRÁFICOS CENTRAIS ---
+    # --- GRÁFICOS ---
     g1, g2 = st.columns([1.2, 1])
-    
     with g1:
-        st.markdown("**Perdas vs. Estornos**")
-        df_g = df_filt.groupby('tipo_clean')[['v_1c', 'v_falta']].sum().reset_index()
-        df_g['total'] = df_g['v_1c'] + df_g['v_falta']
-        
-        # Correção do gráfico: valores negativos para baixo
-        fig = px.bar(df_g, x='tipo_clean', y='total', color='tipo_clean', 
-                     color_discrete_map={'CD':'#3a86ff','LV':'#8338ec','DQS':'#06d6a0'},
-                     text_auto='.2s')
-        
-        fig.update_layout(template="plotly_dark", height=380, showlegend=False, 
-                          paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                          yaxis_title="R$ Total", xaxis_title="")
-        # Inverte o eixo se quiser garantir, mas o Plotly já faz automático se o valor for negativo
+        st.markdown("**Perdas vs. Estornos (Visão por Tipo)**")
+        df_g = df_filt.groupby('tipo_clean')[['v_1c', 'v_falta']].sum().sum(axis=1).reset_index(name='val')
+        # Inversão visual: barras para cima, rótulo mantém o sinal real
+        fig = px.bar(df_g, x='tipo_clean', y=df_g['val'].abs(), color='tipo_clean', 
+                     color_discrete_map={'CD':'#3a86ff','LV':'#8338ec','DQS':'#06d6a0'}, text_auto='.2s')
+        fig.update_layout(template="plotly_dark", height=380, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', yaxis_visible=False)
         st.plotly_chart(fig, use_container_width=True)
 
     with g2:
         st.markdown("**Status de Saúde Treemap**")
         df_tree = df_filt[df_filt['v_1c'] != 0].copy()
-        df_tree['cd_lbl'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-        
-        fig_t = px.treemap(df_tree, path=['tipo_clean', 'cd_lbl'], values=df_tree['v_1c'].abs(),
+        fig_t = px.treemap(df_tree, path=['tipo_clean', 'cd_t'], values=df_tree['v_1c'].abs(),
                            color='tipo_clean', color_discrete_map={'CD':'#0040ff','LV':'#aa00ff','DQS':'#00d2ff'})
         fig_t.update_layout(template="plotly_dark", height=380, margin=dict(t=0,b=0,l=0,r=0))
         st.plotly_chart(fig_t, use_container_width=True)
 
-    # --- TABELA ---
+    # --- TABELA À PROVA DE COMPARAÇÃO ---
     st.markdown("**Detalhamento Operacional**")
     df_tab = df_filt.copy()
-    df_tab['cd_t'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-    df_tab['%'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
-    df_show = df_tab[['tipo_clean', 'cd_t', 'local', 'v_1c', '%', 'v_falta', 'is_fin']].reset_index(drop=True)
+    df_tab['%_u'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
     
-    def style_rows(row):
-        color = '#451a1a' if row['v_1c'] < 0 else '#1a4523'
-        return [f'background-color: {color}'] * len(row)
+    # Criamos a coluna de cor pré-calculada para evitar que o Styler faça contas com strings
+    df_tab['color_hex'] = df_tab['v_1c'].apply(lambda x: '#451a1a' if float(x) < 0 else '#1a4523')
+    
+    df_show = df_tab[['tipo_clean', 'cd_t', 'local', 'v_1c', '%_u', 'v_falta', 'is_fin', 'color_hex']].reset_index(drop=True)
 
-    st.dataframe(df_show.style.apply(style_rows, axis=1), use_container_width=True, hide_index=True)
+    def style_final(row):
+        return [f"background-color: {row['color_hex']}"] * len(row)
+
+    st.dataframe(
+        df_show.style.apply(style_final, axis=1)
+        .format({'v_1c': 'R$ {:,.2f}', 'v_falta': 'R$ {:,.2f}', '%_u': '{:.4f}%'}),
+        column_config={"color_hex": None}, # Oculta a coluna de cores do usuário
+        use_container_width=True, hide_index=True, height=450
+    )
 
 except Exception as e:
-    st.error(f"Erro detectado: {e}")
+    st.error(f"Erro Crítico de Renderização: {e}")
