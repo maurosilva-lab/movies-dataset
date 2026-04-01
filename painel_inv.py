@@ -7,6 +7,7 @@ import re
 st.set_page_config(layout="wide", page_title="Prevenção | BI Executive", page_icon="📊")
 
 # --- ESTILIZAÇÃO CSS (Big Numbers + 6 Cards) ---
+# --- ESTILIZAÇÃO CSS (Big Numbers + Cards) ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
@@ -15,28 +16,24 @@ st.markdown("""
     .header-box {
         background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
         padding: 1rem; border-radius: 0 0 15px 15px; text-align: center;
-        margin-bottom: 1.5rem; box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
+        margin-bottom: 0rem; /* <-- AQUI FOI ZERADO PARA SUBIR OS CARDS */
+        box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
     }
     .header-title { color: white !important; font-size: 26px !important; font-weight: 800 !important; margin:0; }
 
     .card-kpi {
         background: #161b22; border: 1px solid #30363d;
         border-radius: 12px; padding: 15px; text-align: center;
-        min-height: 125px; border-bottom: 4px solid #00d2ff;
+        border-bottom: 4px solid #00d2ff;
     }
     .label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
     .value-kpi { color: #f0f6fc; font-size: 26px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; }
     .sub-kpi { color: #00d2ff; font-size: 12px; font-weight: 500; }
 
-    .target-container {
-        background: #21262d; border-radius: 4px; height: 25px; 
-        position: relative; overflow: hidden; margin: 10px 0;
-        display: flex; align-items: center; justify-content: center;
+    /* Força os blocos do Streamlit a terem menos espaço vertical entre eles */
+    div[data-testid="column"] {
+        margin-top: -10px; /* Puxa levemente os cards para cima */
     }
-    .target-fill { background: #00d2ff; height: 100%; position: absolute; left: 0; z-index: 1; box-shadow: 0 0 10px #00d2ff; }
-    .target-text { color: white; font-weight: 800; z-index: 2; font-size: 13px; }
-    .target-line { position: absolute; height: 100%; width: 2px; background: #00f2ff; z-index: 3; }
-    .target-label { font-size: 9px; color: #8b949e; }
     </style>
 """, unsafe_allow_html=True)
 
