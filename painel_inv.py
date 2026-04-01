@@ -6,12 +6,12 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
-# --- CSS AJUSTADO (Espaçamento e Cores) ---
+# --- CSS AJUSTADO ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] { display: none; }
     .block-container { 
-        padding-top: 1rem !important; /* Espaço no topo solicitado */
+        padding-top: 1rem !important; 
         margin-top: -20px !important; 
     }
     [data-testid="stAppViewContainer"] { background-color: #0b0e14 !important; }
@@ -43,7 +43,7 @@ def load_data():
     return df
 
 def limpar_valor(v):
-    if pd.isna(v) or str(v).strip() in ["", "-", "nan"]: return 0.0
+    if pd.isna(v) or str(v).strip() in ["", "-", "nan", "None"]: return 0.0
     val = str(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
     val = re.sub(r'[^0-9\.\-]', '', val)
     try: return float(val)
@@ -52,29 +52,29 @@ def limpar_valor(v):
 try:
     df_raw = load_data().copy()
     
-    # Processamento de Dados
-    df_raw['v_1c'] = df_raw['1__ciclo'].apply(limpar_valor) if '1__ciclo' in df_raw.columns else 0.0
-    df_raw['v_falta'] = df_raw['falta_vol'].apply(limpar_valor) if 'falta_vol' in df_raw.columns else 0.0
-    df_raw['v_fat'] = df_raw['faturamento'].apply(limpar_valor) if 'faturamento' in df_raw.columns else 0.0
-    df_raw['tipo_clean'] = df_raw['tipo'].fillna('OUTROS').astype(str).str.upper()
+    # Processamento Robusto
+    df_raw['v_1c'] = pd.to_numeric(df_raw['1__ciclo'].apply(limpar_valor), errors='coerce').fillna(0.0)
+    df_raw['v_falta'] = pd.to_numeric(df_raw['falta_vol'].apply(limpar_valor), errors='coerce').fillna(0.0)
+    df_raw['v_fat'] = pd.to_numeric(df_raw['faturamento'].apply(limpar_valor), errors='coerce').fillna(0.0)
+    
+    df_raw['tipo_clean'] = df_raw['tipo'].fillna('OUTROS').astype(str).str.upper().str.strip()
     df_raw['cd_t'] = df_raw['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
     df_raw['is_fin'] = df_raw['v_1c'] != 0
 
-    # --- SIDEBAR COM TODOS OS FILTROS REATIVADOS ---
+    # --- SIDEBAR (FILTROS) ---
     with st.sidebar:
         st.header("⚙️ Filtros")
         if st.button("🔄 Atualizar Dados"):
             st.cache_data.clear()
             st.rerun()
         
-        # Filtros solicitados
         f_ano = st.multiselect("Ano", options=sorted(df_raw['ano'].unique()) if 'ano' in df_raw.columns else [])
         f_sem = st.multiselect("Semestre", options=sorted(df_raw['semestre'].unique()) if 'semestre' in df_raw.columns else [])
         f_tipo = st.multiselect("Tipo", options=sorted(df_raw['tipo_clean'].unique()))
         f_ger = st.multiselect("Gerente", options=sorted(df_raw['divisional'].unique()) if 'divisional' in df_raw.columns else [])
         f_cd = st.multiselect("CD", options=sorted(df_raw['cd_t'].unique()))
 
-    # Aplicação dos Filtros
+    # Aplicação de Filtros
     df_filt = df_raw.copy()
     if f_ano: df_filt = df_filt[df_filt['ano'].isin(f_ano)]
     if f_sem: df_filt = df_filt[df_filt['semestre'].isin(f_sem)]
@@ -85,12 +85,11 @@ try:
     # --- TÍTULO ---
     st.markdown('<div class="header-box"><p class="header-title">PAINEL FECHAMENTO MAGALOG 2026</p></div>', unsafe_allow_html=True)
 
-    # --- KPIS (ORDEM E CÁLCULO % CORRIGIDOS) ---
+    # --- KPIS ---
     v_1c = df_filt['v_1c'].sum()
     v_falta = df_filt['v_falta'].sum()
     v_perda_ano = v_1c + v_falta
     fat_total = df_filt['v_fat'].sum()
-    # % Perda corrigido (valor absoluto da perda sobre faturamento)
     perc_perda = (abs(v_perda_ano) / fat_total * 100) if fat_total > 0 else 0.0
     
     total_un = len(df_filt)
@@ -106,23 +105,18 @@ try:
         st.markdown(f'''<div class="card-kpi"><p class="label-kpi">Status Unidades</p><p class="value-kpi">{total_un}</p>
                     <p class="sub-value"><span style="color:#00d2ff">Fin: {fechadas}</span> | <span style="color:#ff4b4b">Pend: {pendentes}</span></p></div>''', unsafe_allow_html=True)
 
-    # --- GRÁFICOS CENTRAIS ---
+    # --- GRÁFICOS ---
     g1, g2 = st.columns([1.2, 1])
-    
     with g1:
         st.markdown("**Perdas vs. Estornos**")
         df_g = df_filt.groupby('tipo_clean')[['v_1c', 'v_falta']].sum().reset_index()
         df_g['total'] = df_g['v_1c'] + df_g['v_falta']
         
-        # Ajuste Senior: Usamos valor absoluto para a barra e cor/texto para o valor real
-        # Isso faz as barras negativas "subirem" para melhor visualização, mantendo o sinal
+        # Inversão Visual: Barras crescendo para cima mesmo sendo perdas (valores negativos)
         fig = px.bar(df_g, x='tipo_clean', y=df_g['total'].abs(), color='tipo_clean', 
                      color_discrete_map={'CD':'#3a86ff','LV':'#8338ec','DQS':'#06d6a0'},
-                     text=df_g['total'].apply(lambda x: f"R$ {x:,.0s}"))
-        
-        fig.update_layout(template="plotly_dark", height=380, showlegend=False, 
-                          paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                          yaxis_visible=False, xaxis_title="")
+                     text=df_g['total'].apply(lambda x: f"R$ {x:,.0f}"))
+        fig.update_layout(template="plotly_dark", height=380, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', yaxis_visible=False)
         st.plotly_chart(fig, use_container_width=True)
 
     with g2:
@@ -133,19 +127,19 @@ try:
         fig_t.update_layout(template="plotly_dark", height=380, margin=dict(t=0,b=0,l=0,r=0))
         st.plotly_chart(fig_t, use_container_width=True)
 
-    # --- TABELA DETALHADA ---
+    # --- TABELA (FIX ERRO DE TIPO FLOAT vs STR) ---
     st.markdown("**Detalhamento Operacional**")
-    
-    # Limpeza de erros matemáticos (inf) antes da exibição
     df_tab = df_filt.copy()
     df_tab['%_perda_unid'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).replace([float('inf'), float('-inf')], 0).fillna(0)
-    
-    # Seleção de colunas
     df_show = df_tab[['tipo_clean', 'cd_t', 'local', 'v_1c', '%_perda_unid', 'v_falta', 'is_fin']].reset_index(drop=True)
     
-    # Estilização e Formatação de Moeda
     def style_rows(row):
-        color = '#451a1a' if row['v_1c'] < 0 else '#1a4523'
+        # Conversão de segurança para garantir que a comparação seja entre números
+        try:
+            val = float(row['v_1c'])
+        except:
+            val = 0.0
+        color = '#451a1a' if val < 0 else '#1a4523'
         return [f'background-color: {color}'] * len(row)
 
     st.dataframe(
