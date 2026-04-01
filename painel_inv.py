@@ -6,11 +6,15 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
-# --- CSS DEFINITIVO (Título no Topo e Estilo Flutuante) ---
+# --- CSS DEFINITIVO (Título no Topo Absoluto + Estilo Flutuante) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] { display: none; }
-    .block-container { padding-top: 0.5rem !important; margin-top: -20px !important; }
+    .block-container {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0rem !important;
+        margin-top: -20px !important;
+    }
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
 
     .header-box {
@@ -35,6 +39,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- FUNÇÕES DE LIMPEZA ---
 def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "-", "nan"]: return 0.0
     val = str(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
@@ -46,6 +51,7 @@ def mapear_divisional(cd):
     if pd.isna(cd) or str(cd).strip() in ["", "nan", "0"]: return "Indefinido"
     try: n_cd = int(re.sub(r'\D', '', str(cd).split('.')[0]))
     except: return "Indefinido"
+    # Mapeamento exemplo (ajuste conforme sua regra)
     if n_cd in [590, 300, 50]: return 'Renato Nesello'
     elif n_cd in [2650, 994, 991, 1100, 1500, 1800, 1250]: return 'Antônio Paiva'
     elif n_cd in [350, 5200, 2900, 94, 490, 550, 2500, 1440]: return 'Christian'
@@ -73,10 +79,10 @@ try:
     df_raw['v_falta'] = df_raw[c_fal].apply(limpar_valor) if c_fal else 0.0
     df_raw['is_fin'] = df_raw['v_1c'] != 0
 
-    # SIDEBAR COM FILTROS
+    # SIDEBAR COM FILTROS RESTAURADOS
     with st.sidebar:
         st.header("⚙️ Gerenciamento")
-        if st.button("🔄 Atualizar Dados"): st.cache_data.clear(); st.rerun()
+        if st.button("🔄 Atualizar"): st.cache_data.clear(); st.rerun()
         t_sel = st.multiselect("Filtrar por Tipo", options=sorted(df_raw['tipo_clean'].unique()))
         d_sel = st.multiselect("Filtrar Gerente", options=sorted([x for x in df_raw['divisional'].unique() if x != "Indefinido"]))
 
@@ -93,16 +99,17 @@ try:
 
     m1, m2, m3, m4, m5 = st.columns(5)
     with m1: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consolidada</div><div class="value-kpi">R$ {perda_total:,.0f}</div><div class="sub-kpi">1C + Falta</div></div>', unsafe_allow_html=True)
-    with m2: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Volume Falta</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">Itens de Estoque</div></div>', unsafe_allow_html=True)
-    with m3: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Total Unidades</div><div class="value-kpi">{total_un}</div><div class="sub-kpi">Base Cadastrada</div></div>', unsafe_allow_html=True)
+    with m2: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Falta Volume</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">Itens de Estoque</div></div>', unsafe_allow_html=True)
+    with m3: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Total Unidades</div><div class="value-kpi">{total_un}</div><div class="sub-kpi">Base Operacional</div></div>', unsafe_allow_html=True)
     with m4: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Finalizadas</div><div class="value-kpi" style="color:#00d2ff">{fechadas}</div><div class="sub-kpi">Status Concluído</div></div>', unsafe_allow_html=True)
     with m5: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Pendentes</div><div class="value-kpi" style="color:#ff4b4b">{pendentes}</div><div class="sub-kpi">Em Aberto</div></div>', unsafe_allow_html=True)
 
-    # --- GRÁFICOS DO MEIO ---
+    # GRÁFICOS DO MEIO
     g1, g2 = st.columns([1, 1.1])
     with g1:
         st.subheader("📊 Resultado Consolidado")
         st.markdown('<div class="plot-container">', unsafe_allow_html=True)
+        # Soma v_1c e v_falta para o gráfico de barras
         df_p = df_filt.groupby('tipo_clean')[['v_1c', 'v_falta']].sum().sum(axis=1).reset_index(name='res')
         fig_b = px.bar(df_p[df_p['res']!=0], x='tipo_clean', y=df_p['res'].abs(), text='res', color='tipo_clean',
                        color_discrete_map={'CD':'#3a7bd5','LV':'#7000ff','DQS':'#00f2ff'})
@@ -116,7 +123,8 @@ try:
         st.markdown('<div class="plot-container">', unsafe_allow_html=True)
         df_tree = df_filt[df_filt['v_1c'] != 0].copy()
         df_tree['cd_label'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-        # HIERARQUIA: Garante a separação visual dos CDs dentro do Tipo
+        
+        # PATH DINÂMICO PARA SEPARAR OS CDs POR QUADRADOS
         fig_t = px.treemap(df_tree, path=['tipo_clean', 'cd_label'], values=df_tree['v_1c'].abs(), 
                            color='tipo_clean', color_discrete_map={'CD':'#0040ff','LV':'#aa00ff','DQS':'#00d2ff'})
         fig_t.update_traces(textinfo="label+value", texttemplate="<b>%{label}</b><br>R$ %{value:,.0f}")
@@ -124,7 +132,7 @@ try:
         st.plotly_chart(fig_t, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TABELA DE DETALHAMENTO (FIX DEFINITIVO DO ERRO DE LENGTH) ---
+    # --- TABELA DE DETALHAMENTO (CORREÇÃO DEFINITIVA DO ERRO DE LENGTH) ---
     st.subheader("📋 Detalhamento Operacional")
     df_tab = df_filt.copy()
     
@@ -136,10 +144,10 @@ try:
     cols_to_show = ['semestre', 'tipo_clean', 'divisional', 'cd_t', 'local', 'v_1c', '%_unid', 'v_falta', 'is_fin']
     df_ex = df_tab[cols_to_show]
 
-    # Função de estilo blindada: ela gera uma lista de cores baseada exatamente no número de colunas atual
+    # FUNÇÃO DE ESTILO BLINDADA: ela gera uma lista de cores baseada exatamente no número de colunas da linha
     def apply_row_style(row):
         color = 'background-color: #451a1a' if row['v_1c'] < 0 else 'background-color: #1a4523'
-        return [color for _ in row]
+        return [color for _ in row] # Cria uma lista com a mesma largura do DataFrame
 
     st.dataframe(
         df_ex.style.apply(apply_row_style, axis=1), 
