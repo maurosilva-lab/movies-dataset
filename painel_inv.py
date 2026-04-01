@@ -109,8 +109,7 @@ try:
     with k2: st.markdown(f'<div class="card-neon"><div class="label-neon">% Perda Global</div><div class="value-neon">{p_glob:.3f}%</div><div class="sub-neon">Sobre Faturamento</div></div>', unsafe_allow_html=True)
     with k3: st.markdown(f'<div class="card-neon"><div class="label-neon">Volume Falta</div><div class="value-neon">{int(vfal):,}</div><div class="sub-neon">Itens Pendentes</div></div>', unsafe_allow_html=True)
     with k4: st.markdown(f'<div class="card-neon"><div class="label-neon">Evolução</div><div class="value-neon">{concl:.1f}%</div><div class="p-bar-bg"><div class="p-bar-fill" style="width:{concl}%"></div></div></div>', unsafe_allow_html=True)
-
-  # --- SEÇÃO 1: GRÁFICOS DO MEIO (RESULTADO CONSOLIDADO + TREEMAP) ---
+# --- SEÇÃO 1: GRÁFICOS DO MEIO (RESULTADO CONSOLIDADO + TREEMAP) ---
     st.markdown("<br>", unsafe_allow_html=True)
     
     col_esquerda, col_direita = st.columns([1, 1.1])
@@ -118,18 +117,17 @@ try:
     with col_esquerda:
         st.subheader("📊 Resultado Consolidado por Processo")
         
-        # Criamos uma cópia para não afetar o dataframe original e garantimos os nomes
+        # Criamos uma cópia para o cálculo e identificamos o nome da coluna de falta
         df_proc_plot = df_filt.copy()
+        col_f_nome = 'v_fal' if 'v_fal' in df_proc_plot.columns else 'v_falta'
         
-        # PADRONIZAÇÃO: Somamos v_1c e v_fal (ou v_falta, dependendo do seu mapeamento)
-        # Verifique se no seu script a coluna de falta se chama 'v_fal' ou 'v_falta'
-        col_falta_nome = 'v_fal' if 'v_fal' in df_proc_plot.columns else 'v_falta'
+        # SOMA: 1º Ciclo + Falta Vol
+        df_proc_plot['v_consolidada_tipo'] = df_proc_plot['v_1c'] + df_proc_plot[col_f_nome]
         
-        df_proc_plot['v_consolidada_tipo'] = df_proc_plot['v_1c'] + df_proc_plot[col_falta_nome]
-        
+        # Agrupamento por Tipo (CD, LV, DQS)
         df_proc = df_proc_plot.groupby('tipo_clean')['v_consolidada_tipo'].sum().reset_index()
         
-        # Valor absoluto para a barra crescer para cima
+        # Valor absoluto para a barra crescer para cima (Estética)
         df_proc['v_abs'] = df_proc['v_consolidada_tipo'].abs()
         
         fig_b = px.bar(
@@ -137,7 +135,7 @@ try:
             x='tipo_clean', 
             y='v_abs', 
             color='tipo_clean',
-            text='v_consolidada_tipo', 
+            text='v_consolidada_tipo', # Exibe o valor real negativo no rótulo
             color_discrete_map={
                 'CD': '#3a7bd5',   
                 'LV': '#7000ff',   
@@ -168,13 +166,14 @@ try:
         st.subheader("🏢 Status de Saúde (Tipo > CD)")
         
         df_tree = df_filt.copy()
-        # Mesma lógica de padronização aqui
-        col_falta_tree = 'v_fal' if 'v_fal' in df_tree.columns else 'v_falta'
-        df_tree['v_consolidada_tree'] = df_tree['v_1c'] + df_tree[col_falta_tree]
+        col_f_tree = 'v_fal' if 'v_fal' in df_tree.columns else 'v_falta'
+        df_tree['v_consolidada_tree'] = df_tree['v_1c'] + df_tree[col_f_tree]
         
+        # Filtra apenas registros com movimentação
         df_tree = df_tree[df_tree['v_consolidada_tree'] != 0].copy()
         df_tree['cd_label'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
         
+        # HIERARQUIA: Tipo (CD/LV/DQS) -> Código da Unidade
         fig_t = px.treemap(
             df_tree, 
             path=['tipo_clean', 'cd_label'],
@@ -201,6 +200,53 @@ try:
             paper_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig_t, use_container_width=True)
+
+    # --- SEÇÃO 2: BASE (TABELA SEM CORTE + PIZZA) ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_tab_base, col_pie_base = st.columns([3, 1.2])
+
+    with col_tab_base:
+        st.subheader("📋 Detalhamento Operacional")
+        df_tab = df_filt.copy()
+        col_f_tab = 'v_fal' if 'v_fal' in df_tab.columns else 'v_falta'
+        
+        df_tab['v_fat'] = pd.to_numeric(df_tab['v_fat'], errors='coerce').fillna(0)
+        df_tab['%'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
+        df_tab['cd'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
+        
+        df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd', 'local', 'v_1c', '%', col_f_tab, 'is_fin']]
+
+        def styler(row):
+            bg = 'background-color: #451a1a;' if row['v_1c'] < 0 else 'background-color: #1a4523;'
+            return [bg] * len(row)
+
+        st.dataframe(
+            df_ex.style.apply(styler, axis=1), 
+            column_config={
+                "v_1c": st.column_config.NumberColumn("Resultado", format="R$ %.2f"),
+                "%": st.column_config.NumberColumn("%", format="%.4f%%"),
+                col_f_tab: st.column_config.NumberColumn("Falta", format="%.0f"),
+                "is_fin": "Fim"
+            }, 
+            use_container_width=True, hide_index=True, height=None # Automático para não cortar
+        )
+
+    with col_pie_base:
+        st.subheader("📍 Perda / Gerência")
+        df_p = df_filt[df_filt['divisional'] != "Indefinido"]
+        
+        fig_p = px.pie(
+            df_p, values=df_p['v_1c'].abs(), names='divisional', hole=0.7, 
+            color_discrete_sequence=["#00d2ff", "#008cff", "#0040ff", "#3a7bd5"]
+        )
+        fig_p.update_layout(
+            template="plotly_dark", height=500, 
+            margin=dict(t=50, b=50, l=0, r=0), 
+            paper_bgcolor='rgba(0,0,0,0)',
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+        )
+        st.plotly_chart(fig_p, use_container_width=True)
 
 except Exception as e:
     st.error(f"⚠️ Erro ao renderizar: {e}")
