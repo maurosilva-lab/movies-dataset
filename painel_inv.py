@@ -6,13 +6,18 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
-# --- CSS DEFINITIVO (Ajuste de Topo e Sombras) ---
+# --- CSS DEFINITIVO (Título no Topo Absoluto + Fix de Espaçamento) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] { display: none; }
-    .block-container { padding-top: 0.5rem !important; margin-top: -20px !important; }
+    .block-container {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0rem !important;
+        margin-top: -25px !important;
+    }
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
 
+    /* Header no Topo */
     .header-box {
         background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
         padding: 0.8rem !important; border-radius: 10px; text-align: center;
@@ -20,6 +25,7 @@ st.markdown("""
     }
     .header-title { color: white !important; font-size: 22px !important; font-weight: 800 !important; margin:0; }
 
+    /* Cards KPI */
     .card-kpi {
         background: #161b22; border: 1px solid #30363d; border-radius: 12px;
         padding: 15px; text-align: center; min-height: 120px; border-bottom: 4px solid #00d2ff !important;
@@ -28,6 +34,7 @@ st.markdown("""
     .label-kpi { color: #8b949e; font-size: 10px; font-weight: 600; text-transform: uppercase; }
     .sub-kpi { color: #00d2ff; font-size: 11px; }
 
+    /* Containers de Gráficos */
     .plot-container {
         background-color: #161b22; padding: 15px; border-radius: 15px;
         border: 1px solid #30363d; box-shadow: 0 6px 12px rgba(0,0,0,0.4);
@@ -35,7 +42,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE LIMPEZA ---
+# --- FUNÇÕES ---
 def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "-", "nan"]: return 0.0
     val = str(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
@@ -54,6 +61,7 @@ try:
     df_raw = load_data().copy()
     df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
     
+    # Mapeamento de colunas dinâmico
     c_1c = next((c for c in df_raw.columns if '1__ciclo' in c), None)
     c_fat = next((c for c in df_raw.columns if 'faturamento' in c), None)
     c_fal = next((c for c in df_raw.columns if 'falta_vol' in c), None)
@@ -63,6 +71,7 @@ try:
     df_raw['v_falta'] = df_raw[c_fal].apply(limpar_valor) if c_fal else 0.0
     df_raw['is_fin'] = df_raw['v_1c'] != 0
 
+    # SIDEBAR
     with st.sidebar:
         st.header("⚙️ Gerenciamento")
         if st.button("🔄 Atualizar"): st.cache_data.clear(); st.rerun()
@@ -79,13 +88,13 @@ try:
     total_un = len(df_filt); fechadas = df_filt['is_fin'].sum(); pendentes = total_un - fechadas
 
     m1, m2, m3, m4, m5 = st.columns(5)
-    with m1: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consolidada</div><div class="value-kpi">R$ {perda_total:,.0f}</div><div class="sub-kpi">1C + Falta</div></div>', unsafe_allow_html=True)
-    with m2: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Falta Volume</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">Mercadoria</div></div>', unsafe_allow_html=True)
+    with m1: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consolidada</div><div class="value-kpi">R$ {perda_total:,.0f}</div><div class="sub-kpi">Financeiro + Falta</div></div>', unsafe_allow_html=True)
+    with m2: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Falta Volume</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">Itens em Estoque</div></div>', unsafe_allow_html=True)
     with m3: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Total Unidades</div><div class="value-kpi">{total_un}</div><div class="sub-kpi">Base Operacional</div></div>', unsafe_allow_html=True)
-    with m4: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Finalizadas</div><div class="value-kpi" style="color:#00d2ff">{fechadas}</div><div class="sub-kpi">Concluídas</div></div>', unsafe_allow_html=True)
-    with m5: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Pendentes</div><div class="value-kpi" style="color:#ff4b4b">{pendentes}</div><div class="sub-kpi">Aguardando</div></div>', unsafe_allow_html=True)
+    with m4: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Finalizadas</div><div class="value-kpi" style="color:#00d2ff">{fechadas}</div><div class="sub-kpi">Status Concluído</div></div>', unsafe_allow_html=True)
+    with m5: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Pendentes</div><div class="value-kpi" style="color:#ff4b4b">{pendentes}</div><div class="sub-kpi">Em Aberto</div></div>', unsafe_allow_html=True)
 
-    # GRÁFICOS
+    # --- GRÁFICOS DO MEIO ---
     g1, g2 = st.columns([1, 1.1])
     with g1:
         st.subheader("📊 Resultado Consolidado")
@@ -99,12 +108,12 @@ try:
         st.markdown('</div>', unsafe_allow_html=True)
 
     with g2:
-        st.subheader("🏢 Status de Saúde (Por CD)")
+        st.subheader("🏢 Status de Saúde (Divisão por CD)")
         st.markdown('<div class="plot-container">', unsafe_allow_html=True)
         df_tree = df_filt[df_filt['v_1c'] != 0].copy()
         df_tree['cd_lbl'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
         
-        # PATH COM DOIS NÍVEIS PARA GERAR AS DIVISÓRIAS ENTRE CDs
+        # PATH COM DOIS NÍVEIS GERA AS DIVISÓRIAS ENTRE CDs
         fig_t = px.treemap(df_tree, path=['tipo_clean', 'cd_lbl'], values=df_tree['v_1c'].abs(), 
                            color='tipo_clean', color_discrete_map={'CD':'#0040ff','LV':'#aa00ff','DQS':'#00d2ff'})
         fig_t.update_traces(textinfo="label+value", texttemplate="<b>%{label}</b><br>R$ %{value:,.0f}")
@@ -112,28 +121,28 @@ try:
         st.plotly_chart(fig_t, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # TABELA FINAL SEM ERROS
+    # --- TABELA DE DETALHAMENTO (FIX DEFINITIVO DO ERRO) ---
     st.subheader("📋 Detalhamento Operacional")
     df_tab = df_filt.copy()
     df_tab['%_unid'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
     df_tab['cd_t'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
     
-    # Colunas fixas
+    # Selecionamos as colunas finais
     df_ex = df_tab[['semestre', 'tipo_clean', 'cd_t', 'local', 'v_1c', '%_unid', 'v_falta', 'is_fin']]
 
-    # Função que pinta a linha baseado apenas no valor de v_1c
-    def apply_color(row):
+    # Função de estilo 100% dinâmica que se adapta ao número de colunas do DataFrame
+    def apply_color_row(row):
         color = 'background-color: #451a1a' if row['v_1c'] < 0 else 'background-color: #1a4523'
-        return [color for _ in row] # Cria a lista de cores do tamanho exato da linha
+        return [color for _ in range(len(row))]
 
     st.dataframe(
-        df_ex.style.apply(apply_color, axis=1), 
+        df_ex.style.apply(apply_color_row, axis=1), 
         column_config={
             "v_1c": st.column_config.NumberColumn("Resultado", format="R$ %.2f"),
             "%_unid": st.column_config.NumberColumn("% Unid", format="%.4f%%"),
             "v_falta": st.column_config.NumberColumn("Falta", format="R$ %.0f")
         },
-        use_container_width=True, hide_index=True, height=400
+        use_container_width=True, hide_index=True, height=450
     )
 
 except Exception as e:
