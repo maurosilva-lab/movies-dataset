@@ -228,8 +228,11 @@ try:
                 col_f_tab: st.column_config.NumberColumn("Falta", format="%.0f"),
                 "is_fin": "Fim"
             }, 
-            use_container_width=True, hide_index=True, height=None # Automático para não cortar
-        )
+            use_container_width=True, 
+            hide_index=True,
+            height="content" # <--- O segredo está aqui: mudei de None para "content"
+        )# Automático para não cortar
+            
 
     with col_pie_base:
         st.subheader("📍 Perda / Gerência")
