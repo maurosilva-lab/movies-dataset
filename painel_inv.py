@@ -6,13 +6,15 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
-# --- CSS DEFINITIVO (Título no Topo Absoluto + Efeito Flutuante) ---
+# --- CSS DEFINITIVO (Título no Topo Absoluto + Estilo Flutuante) ---
 st.markdown("""
     <style>
+    /* Remove o header nativo e cola o título no topo */
     [data-testid="stHeader"] { display: none; }
     .block-container {
         padding-top: 0.5rem !important;
-        margin-top: -20px !important;
+        padding-bottom: 0rem !important;
+        margin-top: -25px !important;
     }
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
 
@@ -23,22 +25,24 @@ st.markdown("""
     }
     .header-title { color: white !important; font-size: 22px !important; font-weight: 800 !important; margin:0; }
 
+    /* Cards KPI */
     .card-kpi {
         background: #161b22; border: 1px solid #30363d; border-radius: 12px;
         padding: 15px; text-align: center; min-height: 120px; border-bottom: 4px solid #00d2ff !important;
     }
-    .value-kpi { color: #f0f6fc; font-size: 30px !important; font-weight: 900 !important; margin: 4px 0; }
+    .value-kpi { color: #f0f6fc; font-size: 28px !important; font-weight: 900 !important; margin: 4px 0; }
     .label-kpi { color: #8b949e; font-size: 10px; font-weight: 600; text-transform: uppercase; }
     .sub-kpi { color: #00d2ff; font-size: 11px; }
 
+    /* Estilo Flutuante para os Containers de Gráficos */
     .plot-container {
         background-color: #161b22; padding: 15px; border-radius: 15px;
-        border: 1px solid #30363d; box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+        border: 1px solid #30363d; box-shadow: 0 6px 12px rgba(0,0,0,0.4);
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE LIMPEZA E MAPEAMENTO ---
+# --- FUNÇÕES DE SUPORTE ---
 def limpar_valor(v):
     if pd.isna(v) or str(v).strip() in ["", "-", "nan"]: return 0.0
     val = str(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
@@ -68,7 +72,6 @@ try:
     df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
     df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional)
     
-    # Mapeamento de colunas financeiras
     c_1c = next((c for c in df_raw.columns if '1__ciclo' in c), None)
     c_fat = next((c for c in df_raw.columns if 'faturamento' in c), None)
     c_fal = next((c for c in df_raw.columns if 'falta_vol' in c), None)
@@ -83,7 +86,7 @@ try:
         st.header("⚙️ Gerenciamento")
         if st.button("🔄 Atualizar Dados"): st.cache_data.clear(); st.rerun()
         t_sel = st.multiselect("Filtrar por Tipo", options=sorted(df_raw['tipo_clean'].unique()))
-        d_sel = st.multiselect("Filtrar Gerente", options=sorted(df_raw['divisional'].unique()))
+        d_sel = st.multiselect("Filtrar Gerente", options=sorted([x for x in df_raw['divisional'].unique() if x != "Indefinido"]))
 
     df_filt = df_raw.copy()
     if t_sel: df_filt = df_filt[df_filt['tipo_clean'].isin(t_sel)]
@@ -91,17 +94,16 @@ try:
 
     st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO MAGALOG 2026</p></div>', unsafe_allow_html=True)
 
-    # --- CÁLCULOS KPI ---
-    p1c = df_filt['v_1c'].sum(); vfal = df_filt['v_falta'].sum(); fat_total = df_filt['v_fat'].sum()
+    # KPIS
+    p1c = df_filt['v_1c'].sum(); vfal = df_filt['v_falta'].sum()
     perda_total = p1c + vfal
-    perc_global = (abs(perda_total) / fat_total * 100) if fat_total > 0 else 0
     total_un = len(df_filt); fechadas = df_filt['is_fin'].sum(); pendentes = total_un - fechadas
 
     m1, m2, m3, m4, m5 = st.columns(5)
-    with m1: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consolidada</div><div class="value-kpi">R$ {perda_total:,.0f}</div><div class="sub-kpi">Impacto: {perc_global:.3f}%</div></div>', unsafe_allow_html=True)
-    with m2: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Falta Volume</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">Estoque</div></div>', unsafe_allow_html=True)
-    with m3: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Total Unidades</div><div class="value-kpi">{total_un}</div><div class="sub-kpi">Mapeadas</div></div>', unsafe_allow_html=True)
-    with m4: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Finalizadas</div><div class="value-kpi" style="color:#00d2ff">{fechadas}</div><div class="sub-kpi">Concluídas</div></div>', unsafe_allow_html=True)
+    with m1: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consolidada</div><div class="value-kpi">R$ {perda_total:,.0f}</div><div class="sub-kpi">1C + Falta</div></div>', unsafe_allow_html=True)
+    with m2: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Falta Volume</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">Mercadoria</div></div>', unsafe_allow_html=True)
+    with m3: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Total Unidades</div><div class="value-kpi">{total_un}</div><div class="sub-kpi">Base Operacional</div></div>', unsafe_allow_html=True)
+    with m4: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Finalizadas</div><div class="value-kpi" style="color:#00d2ff">{fechadas}</div><div class="sub-kpi">Concluído</div></div>', unsafe_allow_html=True)
     with m5: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Pendentes</div><div class="value-kpi" style="color:#ff4b4b">{pendentes}</div><div class="sub-kpi">Em Aberto</div></div>', unsafe_allow_html=True)
 
     # --- GRÁFICOS ---
@@ -122,7 +124,7 @@ try:
         st.markdown('<div class="plot-container">', unsafe_allow_html=True)
         df_tree = df_filt[df_filt['v_1c'] != 0].copy()
         df_tree['cd_lbl'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-        # PATH COM DOIS NÍVEIS PARA SEPARAR OS CDs VISUALMENTE
+        # HIERARQUIA PARA CRIAR AS DIVISÓRIAS ENTRE OS CDs
         fig_t = px.treemap(df_tree, path=['tipo_clean', 'cd_lbl'], values=df_tree['v_1c'].abs(), 
                            color='tipo_clean', color_discrete_map={'CD':'#0040ff','LV':'#aa00ff','DQS':'#00d2ff'})
         fig_t.update_traces(textinfo="label+value", texttemplate="<b>%{label}</b><br>R$ %{value:,.0f}")
@@ -130,16 +132,17 @@ try:
         st.plotly_chart(fig_t, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TABELA (FIX DEFINITIVO DO ERRO DE LENGTH) ---
+    # --- TABELA FINAL (SEM ERROS DE LENGTH) ---
     st.subheader("📋 Detalhamento Operacional")
     df_tab = df_filt.copy()
     df_tab['%_unid'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
     df_tab['cd_t'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
     
     # Seleção de colunas para exibição
-    df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd_t', 'local', 'v_1c', '%_unid', 'v_falta', 'is_fin']]
+    cols = ['semestre', 'tipo_clean', 'divisional', 'cd_t', 'local', 'v_1c', '%_unid', 'v_falta', 'is_fin']
+    df_ex = df_tab[cols]
 
-    # Função de cor individual (MAP) - Blinda contra erro de tamanho de objeto
+    # Estratégia de pintura célula a célula (subset) - Não causa erro de length
     def color_status(val):
         color = '#451a1a' if val < 0 else '#1a4523'
         return f'background-color: {color}'
