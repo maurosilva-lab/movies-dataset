@@ -110,79 +110,70 @@ try:
     with k3: st.markdown(f'<div class="card-neon"><div class="label-neon">Volume Falta</div><div class="value-neon">{int(vfal):,}</div><div class="sub-neon">Itens Pendentes</div></div>', unsafe_allow_html=True)
     with k4: st.markdown(f'<div class="card-neon"><div class="label-neon">Evolução</div><div class="value-neon">{concl:.1f}%</div><div class="p-bar-bg"><div class="p-bar-fill" style="width:{concl}%"></div></div></div>', unsafe_allow_html=True)
 
-   # --- SEÇÃO 1: GRÁFICOS DO MEIO (BARRAS NA ESQUERDA + TREEMAP NA DIREITA) ---
+   # --- SEÇÃO 1: GRÁFICOS DO MEIO (BARRAS + TREEMAP TIPO > CD) ---
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Criamos as colunas e garantimos que o Python leia na ordem correta
-    col_esquerda, col_direita = st.columns([1, 1.2])
+    # Forçamos a criação das colunas de forma limpa
+    col_1, col_2 = st.columns([1, 1.2])
 
-    with col_esquerda:
+    with col_1:
         st.subheader("📊 Top 10 Perdas por Unidade")
         
-        df_grouped = df_filt[df_filt['v_1c'] != 0].copy()
+        # Filtramos e agrupamos por CD (usando tipo_clean para cor)
+        df_top_10 = df_filt[df_filt['v_1c'] < 0].copy()
+        df_top_10['cd_label'] = df_top_10['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
         
-        # Garante a soma por CD e pega os 10 mais negativos
-        df_b_data = df_grouped.groupby('cd')['v_1c'].sum().nsmallest(10).reset_index()
+        df_b_plot = df_top_10.groupby(['cd_label', 'tipo_clean'])['v_1c'].sum().nsmallest(10).reset_index()
         
-        # Limpeza para garantir que o CD não tenha .0 no eixo X
-        df_b_data['cd'] = df_b_data['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-        
-        # Cria o gráfico de barras
         fig_b = px.bar(
-            df_b_data, 
-            x='cd', 
-            y='v_1c', 
-            text_auto='.2s', # Adiciona valor simplificado no topo da barra
-            color='v_1c', 
-            color_continuous_scale='Blues_r'
+            df_b_plot, x='cd_label', y='v_1c', 
+            color='tipo_clean', # Diferencia CD, DQS, LV por cor
+            text_auto='.2s',
+            color_discrete_map={'CD': '#00d2ff', 'DQS': '#3a7bd5', 'LV': '#7000ff'}
         )
         fig_b.update_layout(
-            template="plotly_dark", 
-            height=400, 
-            margin=dict(t=20, b=0, l=0, r=0),
-            paper_bgcolor='rgba(0,0,0,0)', 
-            plot_bgcolor='rgba(0,0,0,0)',
-            coloraxis_showscale=False,
-            xaxis={'tickangle': 0} # Mantém os nomes dos CDs na horizontal
+            template="plotly_dark", height=400, margin=dict(t=20, b=0, l=0, r=0),
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+            showlegend=False, xaxis_title="CD", yaxis_title="Perda R$"
         )
         st.plotly_chart(fig_b, use_container_width=True)
 
-    with col_direita:
+    with col_2:
         st.subheader("🏢 Status de Saúde (Tipo > CD)")
         
         df_tree = df_filt[df_filt['v_1c'] != 0].copy()
-        df_tree['cd'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
+        df_tree['cd_label'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
         
-        # AJUSTE DA HIERARQUIA: Usamos 'tipo_clean' (Filtro por Tipo) como o nível superior
+        # HIERARQUIA POR TIPO CONFORME O PRINT
         fig_t = px.treemap(
             df_tree, 
-            path=['tipo_clean', 'cd'], # Hierarquia corrigida conforme o print
+            path=['tipo_clean', 'cd_label'], # Nível 1: CD/LV/DQS | Nível 2: Número do CD
             values=df_tree['v_1c'].abs(), 
-            color='v_1c', 
-            color_continuous_scale='RdBu_r'
+            color='tipo_clean', # Cores baseadas no Tipo
+            color_discrete_map={'CD': '#0040ff', 'LV': '#aa00ff', 'DQS': '#008cff', 'Others': '#444'}
         )
         
-        # Configuração de texto forçada (exibe label e valor dentro dos quadrados)
+        # Formatação do texto dentro dos quadrados (IGUAL AO PRINT)
         fig_t.update_traces(
             textinfo="label+value",
-            texttemplate="<b>%{label}</b><br>R$ %{value:,.0f}",
+            texttemplate="<span style='font-size:24px'><b>%{label}</b></span><br>R$ %{value:,.0f}",
+            marker_line_width=2,
+            marker_line_color="#0d1117"
         )
         
         fig_t.update_layout(
-            template="plotly_dark", 
-            height=400, 
-            margin=dict(t=20, b=10, l=0, r=0),
+            template="plotly_dark", height=400, margin=dict(t=20, b=10, l=0, r=0),
             paper_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig_t, use_container_width=True)
 
-    # --- SEÇÃO 2: DETALHAMENTO E PIZZA (SIDE-BY-SIDE NA BASE) ---
+    # --- SEÇÃO 2: BASE DO PAINEL (TABELA À ESQUERDA + PIZZA À DIREITA) ---
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Criamos a divisão: 75% para a tabela e 25% para o gráfico lateral
-    col_tabela, col_pizza = st.columns([3, 1.2])
+    # Criamos a divisão lado a lado na base
+    col_tab_base, col_pie_base = st.columns([3, 1.2])
 
-    with col_tabela:
+    with col_tab_base:
         st.subheader("📋 Detalhamento Operacional")
         df_tab = df_filt.copy()
         df_tab['v_fat'] = pd.to_numeric(df_tab['v_fat'], errors='coerce').fillna(0)
@@ -191,7 +182,6 @@ try:
         df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd', 'local', 'v_1c', '%', 'v_fal', 'is_fin']]
 
         def styler(row):
-            # Vermelho escuro para negativo, Verde escuro para positivo
             bg = 'background-color: #451a1a;' if row['v_1c'] < 0 else 'background-color: #1a4523;'
             return [bg] * len(row)
 
@@ -206,7 +196,7 @@ try:
             use_container_width=True, hide_index=True, height=500 
         )
 
-    with col_pizza:
+    with col_pie_base:
         st.subheader("📍 Perda / Gerência")
         df_p = df_filt[df_filt['divisional'] != "Indefinido"]
         
@@ -224,4 +214,4 @@ try:
         st.plotly_chart(fig_p, use_container_width=True)
 
 except Exception as e:
-    st.error(f"⚠️ Erro ao renderizar gráficos: {e}")
+    st.error(f"⚠️ Erro ao renderizar: {e}")
