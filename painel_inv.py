@@ -6,7 +6,7 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
-# --- CSS (Ajuste de Topo e Estilo do Título) ---
+# --- CSS (Espaçamento e Estilo do Título) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] { display: none; }
@@ -31,7 +31,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- ENGINE DE DADOS ---
+# --- FUNÇÕES DE SUPORTE ---
 @st.cache_data(ttl=60)
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1iaHnigQGOH5w4xFlZXN0cXYSZlLqPuHE1Pdsgy0XSdI/export?format=csv&gid=1358149674"
@@ -46,26 +46,27 @@ def limpar_valor(v):
     try: return float(val)
     except: return 0.0
 
+# --- INÍCIO DO BLOCO PRINCIPAL ---
 try:
     df_raw = load_data().copy()
     
-    # Mapeamento Dinâmico de Colunas (Evita KeyError faturamento)
+    # Mapeamento Dinâmico de Colunas
     c_1c = next((c for c in df_raw.columns if '1' in c and 'ciclo' in c), None)
     c_falta = next((c for c in df_raw.columns if 'falta' in c and 'vol' in c), None)
     c_fat = next((c for c in df_raw.columns if 'faturamento' in c or 'fat' in c), None)
     c_div = next((c for c in df_raw.columns if 'divisional' in c or 'gerente' in c), None)
 
-    # Conversão Numérica Explícita (Previne o erro de float vs str)
-    df_raw['v_1c'] = pd.to_numeric(df_raw[c_1c].apply(limpar_valor), errors='coerce').fillna(0.0)
-    df_raw['v_falta'] = pd.to_numeric(df_raw[c_falta].apply(limpar_valor), errors='coerce').fillna(0.0)
-    df_raw['v_fat'] = pd.to_numeric(df_raw[c_fat].apply(limpar_valor), errors='coerce').fillna(0.0)
+    # Conversão Numérica
+    df_raw['v_1c'] = pd.to_numeric(df_raw[c_1c].apply(limpar_valor), errors='coerce').fillna(0.0) if c_1c else 0.0
+    df_raw['v_falta'] = pd.to_numeric(df_raw[c_falta].apply(limpar_valor), errors='coerce').fillna(0.0) if c_falta else 0.0
+    df_raw['v_fat'] = pd.to_numeric(df_raw[c_fat].apply(limpar_valor), errors='coerce').fillna(0.0) if c_fat else 0.0
     
-    df_raw['tipo_clean'] = df_raw['tipo'].fillna('OUTROS').astype(str).str.upper().str.strip()
-    df_raw['cd_t'] = df_raw['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
+    df_raw['tipo_clean'] = df_raw['tipo'].fillna('OUTROS').astype(str).str.upper().str.strip() if 'tipo' in df_raw.columns else 'OUTROS'
+    df_raw['cd_t'] = df_raw['cd'].astype(str).str.replace(r'\.0$', '', regex=True) if 'cd' in df_raw.columns else 'N/A'
     df_raw['div_clean'] = df_raw[c_div].fillna('OUTROS').astype(str).str.upper() if c_div else 'OUTROS'
     df_raw['is_fin'] = df_raw['v_1c'] != 0
 
-    # --- FILTROS SIDEBAR ---
+    # --- SIDEBAR (FILTROS) ---
     with st.sidebar:
         st.header("⚙️ Filtros")
         if st.button("🔄 Atualizar Dados"):
@@ -84,21 +85,21 @@ try:
     # --- HEADER ---
     st.markdown('<div class="header-box"><p class="header-title">PAINEL FECHAMENTO MAGALOG 2026</p></div>', unsafe_allow_html=True)
 
-    # --- KPIS (Ordem Corrigida) ---
-    v_1c = df_filt['v_1c'].sum()
-    v_falta = df_filt['v_falta'].sum()
-    v_perda_ano = v_1c + v_falta
+    # --- KPIS ---
+    v_1c_sum = df_filt['v_1c'].sum()
+    v_falta_sum = df_filt['v_falta'].sum()
+    v_perda_total = v_1c_sum + v_falta_sum
     fat_total = df_filt['v_fat'].sum()
-    perc_perda = (abs(v_perda_ano) / fat_total * 100) if fat_total > 0 else 0.0
+    perc_perda = (abs(v_perda_total) / fat_total * 100) if fat_total > 0 else 0.0
     
     total_un = len(df_filt)
     fechadas = df_filt['is_fin'].sum()
     pendentes = total_un - fechadas
 
     k1, k2, k3, k4, k5 = st.columns(5)
-    with k1: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Perda Ano</p><p class="value-kpi">R$ {v_perda_ano:,.0f}</p></div>', unsafe_allow_html=True)
-    with k2: st.markdown(f'<div class="card-kpi"><p class="label-kpi">1º Ciclo</p><p class="value-kpi">R$ {v_1c:,.0f}</p></div>', unsafe_allow_html=True)
-    with k3: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Falta Vol</p><p class="value-kpi">R$ {v_falta:,.0f}</p></div>', unsafe_allow_html=True)
+    with k1: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Perda Ano</p><p class="value-kpi">R$ {v_perda_total:,.0f}</p></div>', unsafe_allow_html=True)
+    with k2: st.markdown(f'<div class="card-kpi"><p class="label-kpi">1º Ciclo</p><p class="value-kpi">R$ {v_1c_sum:,.0f}</p></div>', unsafe_allow_html=True)
+    with k3: st.markdown(f'<div class="card-kpi"><p class="label-kpi">Falta Vol</p><p class="value-kpi">R$ {v_falta_sum:,.0f}</p></div>', unsafe_allow_html=True)
     with k4: st.markdown(f'<div class="card-kpi"><p class="label-kpi">% Perdas</p><p class="value-kpi">{perc_perda:.3f}%</p></div>', unsafe_allow_html=True)
     with k5: 
         st.markdown(f'''<div class="card-kpi"><p class="label-kpi">Status Unidades</p><p class="value-kpi">{total_un}</p>
@@ -107,10 +108,9 @@ try:
     # --- GRÁFICOS ---
     g1, g2 = st.columns([1.2, 1])
     with g1:
-        st.markdown("**Perdas vs. Estornos (Visão por Tipo)**")
+        st.markdown("**Perdas vs. Estornos (Tipo)**")
         df_g = df_filt.groupby('tipo_clean')[['v_1c', 'v_falta']].sum().reset_index()
         df_g['total'] = df_g['v_1c'] + df_g['v_falta']
-        # Barras para cima (Absoluto) com rótulo real (Negativo)
         fig = px.bar(df_g, x='tipo_clean', y=df_g['total'].abs(), color='tipo_clean', 
                      color_discrete_map={'CD':'#3a86ff','LV':'#8338ec','DQS':'#06d6a0'},
                      text=df_g['total'].apply(lambda x: f"R$ {x:,.0f}"))
@@ -125,6 +125,22 @@ try:
         fig_t.update_layout(template="plotly_dark", height=380, margin=dict(t=0,b=0,l=0,r=0))
         st.plotly_chart(fig_t, use_container_width=True)
 
-    # --- TABELA (Higienização de Tipos para Evitar Erro de Comparação) ---
+    # --- TABELA ---
     st.markdown("**Detalhamento Operacional**")
-    df_tab = df_filt
+    df_tab = df_filt.copy()
+    df_tab['%_perda'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).replace([float('inf'), float('-inf')], 0).fillna(0)
+    df_show = df_tab[['tipo_clean', 'cd_t', 'div_clean', 'v_1c', '%_perda', 'v_falta', 'is_fin']].reset_index(drop=True)
+    
+    def style_rows(row):
+        try: val = float(row['v_1c'])
+        except: val = 0.0
+        return [f'background-color: {"#451a1a" if val < 0 else "#1a4523"}'] * len(row)
+
+    st.dataframe(
+        df_show.style.apply(style_rows, axis=1)
+        .format({'v_1c': 'R$ {:,.2f}', 'v_falta': 'R$ {:,.2f}', '%_perda': '{:.4f}%'}), 
+        use_container_width=True, hide_index=True
+    )
+
+except Exception as e:
+    st.error(f"Erro Crítico de Execução: {e}")
