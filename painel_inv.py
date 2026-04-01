@@ -201,15 +201,47 @@ try:
             
             st.plotly_chart(fig_t, use_container_width=True)
 
-    # Tabela Final
+   # --- PREPARAÇÃO DA TABELA FINAL ---
+    st.subheader("📋 Detalhamento por Unidade")
+
+    # 1. Criamos uma cópia para não afetar os cálculos globais
+    df_tab = df_filt.copy()
+
+    # 2. Cálculo do % de Perda por Unidade (v_1c sobre faturamento da unidade)
+    # Usamos abs() na perda para o cálculo de participação se desejar, 
+    # mas aqui faremos a relação direta: (Resultado / Faturamento)
+    df_tab['% Perda'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
+
+    # 3. Limpeza visual do CD (removendo .0)
+    df_tab['cd'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
+
+    # 4. Seleção e Reordem das colunas para exibição
+    colunas_show = ['semestre', 'tipo_clean', 'divisional', 'cd', 'local', 'v_1c', '% Perda', 'v_falta', 'is_finalizado']
+    df_exibir = df_tab[colunas_show]
+
+    # 5. Função de Estilização (Mapa de Calor)
+    def style_v1c(v):
+        # Se o resultado for negativo (perda), fundo avermelhado
+        if v < 0:
+            return 'background-color: #451a1a; color: #ff8888; font-weight: bold;'
+        # Se for zero ou positivo (sem perda), fundo esverdeado
+        elif v >= 0:
+            return 'background-color: #1a4523; color: #88ff88;'
+        return ''
+
+    # Aplicando a estilização
     st.dataframe(
-        df_filt[['semestre', 'tipo_clean', 'divisional', 'cd', 'local', 'v_1c', 'v_falta', 'is_finalizado']],
+        df_exibir.style.map(style_v1c, subset=['v_1c', '% Perda']),
         column_config={
             "v_1c": st.column_config.NumberColumn("Resultado 1C", format="R$ %.2f"),
+            "% Perda": st.column_config.NumberColumn("% Perda", format="%.3f%%"),
             "v_falta": st.column_config.NumberColumn("Falta Vol", format="%.0f"),
-            "is_finalizado": st.column_config.CheckboxColumn("Finalizado?")
+            "is_finalizado": st.column_config.CheckboxColumn("Finalizado?"),
+            "tipo_clean": "Tipo",
+            "cd": "CD"
         },
-        use_container_width=True, hide_index=True
+        use_container_width=True,
+        hide_index=True
     )
 
 except Exception as e:
