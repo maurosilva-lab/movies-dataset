@@ -6,13 +6,12 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
 
-# --- ESTILIZAÇÃO CSS DEFINITIVA (NEON v4) ---
+# --- ESTILIZAÇÃO CSS DEFINITIVA (NEON v5 - Unidades e Targets) ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
     .main { padding: 0rem !important; }
     
-    /* Header Custom */
     .header-box {
         background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
         padding: 1.5rem; border-radius: 0 0 15px 15px; text-align: center;
@@ -20,46 +19,42 @@ st.markdown("""
     }
     .header-title { color: white !important; font-size: 28px !important; font-weight: 800 !important; margin:0; }
 
-    /* Estilo dos Cards KPI Neon */
+    /* Cards KPI */
     .card-kpi {
         background: #161b22; border: 1px solid #30363d;
-        border-radius: 12px; padding: 20px; text-align: center;
-        min-height: 150px; border-bottom: 3px solid #00d2ff;
-        transition: transform 0.3s;
+        border-radius: 12px; padding: 15px; text-align: center;
+        min-height: 130px; border-bottom: 3px solid #00d2ff;
     }
-    .card-kpi:hover { transform: translateY(-5px); border-color: #00f2ff; }
-    
     .label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; }
-    .value-kpi { color: #f0f6fc; font-size: 26px; font-weight: 800; margin: 8px 0; }
-    .sub-kpi { color: #00d2ff; font-size: 13px; font-weight: 500; }
+    .value-kpi { color: #f0f6fc; font-size: 24px; font-weight: 800; margin: 5px 0; }
+    .sub-kpi { color: #00d2ff; font-size: 12px; font-weight: 500; }
 
-    /* Progress Bar (Card Evolução) */
-    .p-bar-bg { background-color: #30363d; border-radius: 5px; height: 8px; width: 100%; margin-top: 15px; }
-    .p-bar-fill { 
-        background: linear-gradient(90deg, #00d2ff, #00f2ff); 
-        height: 8px; border-radius: 5px; box-shadow: 0 0 10px #00d2ff; 
+    /* Barra de Progresso Estilo "Target" (Inspirado no print) */
+    .target-container {
+        background: #21262d; border-radius: 4px; height: 30px; 
+        position: relative; overflow: hidden; margin: 10px 0;
+        display: flex; align-items: center; justify-content: center;
     }
+    .target-fill {
+        background: #00d2ff; height: 100%; position: absolute; left: 0;
+        box-shadow: 0 0 10px #00d2ff; z-index: 1;
+    }
+    .target-text { color: white; font-weight: bold; z-index: 2; font-size: 14px; }
+    .target-line {
+        position: absolute; height: 100%; width: 2px; 
+        background: #00f2ff; z-index: 3; box-shadow: 0 0 8px #00f2ff;
+    }
+    .target-label { font-size: 10px; color: #8b949e; margin-top: -5px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE SUPORTE ---
+# --- FUNÇÕES ---
 def limpar_valor(v):
-    if pd.isna(v) or str(v).strip() in ["", "-", "nan", "DIV/0"]: return 0.0
+    if pd.isna(v) or str(v).strip() in ["", "-", "nan"]: return 0.0
     val = str(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
     val = re.sub(r'[^0-9\.\-]', '', val)
     try: return float(val)
     except: return 0.0
-
-def mapear_divisional(cd):
-    if pd.isna(cd) or str(cd).strip() in ["", "nan", "0"]: return "Indefinido"
-    try:
-        n_cd = int(re.sub(r'\D', '', str(cd).split('.')[0]))
-    except: return "Indefinido"
-    if n_cd in [590, 300, 50]: return 'Renato Nesello'
-    elif n_cd in [2650, 994, 991, 1100, 1500, 1800, 1250]: return 'Antônio Paiva'
-    elif n_cd in [350, 5200, 2900, 94, 490, 550, 2500, 1440]: return 'Christian'
-    elif n_cd in [204, 2489, 97, 549, 2599, 1116, 1889, 389, 1879, 299, 1899, 2989, 5589, 1450, 49, 2999, 2099, 985, 93, 5289, 5299, 2649, 893, 5599, 1869, 1390]: return 'Mileide'
-    return 'Outros'
 
 @st.cache_data(ttl=300)
 def load_data():
@@ -71,49 +66,78 @@ def load_data():
 try:
     df_raw = load_data().copy()
     
-    # Sidebar
-    with st.sidebar:
-        st.header("⚙️ Filtros")
-        if st.button("🔄 Atualizar Dados"): st.cache_data.clear(); st.rerun()
-        df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
-        df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional)
-        t_sel = st.multiselect("Tipo de Processo", options=sorted(df_raw['tipo_clean'].unique()))
-        d_sel = st.multiselect("Gerente Divisional", options=sorted([x for x in df_raw['divisional'].unique() if x != "Indefinido"]))
-
-    # Mapeamento Dinâmico de Colunas
+    # Sidebar e Tratamento (Simplificado)
+    df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
     c_1c = next((c for c in df_raw.columns if '1__ciclo' in c), None)
-    c_fat = next((c for c in df_raw.columns if 'faturamento' in c), None)
     c_fal = next((c for c in df_raw.columns if 'falta_vol' in c), None)
-
     df_raw['v_1c'] = df_raw[c_1c].apply(limpar_valor)
-    df_raw['v_fat'] = df_raw[c_fat].apply(limpar_valor)
     df_raw['v_falta'] = df_raw[c_fal].apply(limpar_valor)
-    df_raw['is_fin'] = df_raw['v_1c'] != 0
+    df_raw['is_fin'] = df_raw['v_1c'] != 0 # Consideramos fechado se tiver valor no 1C
 
-    df_filt = df_raw.copy()
-    if t_sel: df_filt = df_filt[df_filt['tipo_clean'].isin(t_sel)]
-    if d_sel: df_filt = df_filt[df_filt['divisional'].isin(d_sel)]
+    df_filt = df_raw.copy() # (Adicionar lógica de filtros multiselect aqui se desejar)
 
     # --- UI PRINCIPAL ---
     st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO MAGALOG 2026</p></div>', unsafe_allow_html=True)
 
-    # Métricas para os Cards
+    # 1. LINHA DE KPIS FINANCEIROS
+    k1, k2, k3 = st.columns(3)
     p1c = df_filt['v_1c'].sum()
-    v_falta_total = df_filt['v_falta'].sum()
-    faturamento = df_filt['v_fat'].sum()
-    perda_consolidada = p1c + v_falta_total
+    vfal = df_filt['v_falta'].sum()
+    perda_total = p1c + vfal
+    perc_falta = (vfal / perda_total * 100) if perda_total != 0 else 0
+
+    with k1: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consolidada</div><div class="value-kpi">R$ {perda_total:,.0f}</div><div class="sub-kpi">1C + Falta Vol</div></div>', unsafe_allow_html=True)
+    with k2: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Volume Falta</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">{abs(perc_falta):.1f}% do Total de Perdas</div></div>', unsafe_allow_html=True)
+    with k3: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Média por Unidade</div><div class="value-kpi">R$ {perda_total/len(df_filt):,.0f}</div><div class="sub-kpi">Base: {len(df_filt)} Unidades</div></div>', unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 2. LINHA DE UNIDADES (TOTAL, FECHADO, PENDENTE) - ESTILO PRINT
+    u1, u2, u3 = st.columns(3)
+    total_uds = len(df_filt)
+    fechadas = df_filt['is_fin'].sum()
+    pendentes = total_uds - fechadas
+    target_pos = 70 # Exemplo: Linha de meta em 70%
+
+    with u1:
+        st.markdown(f'<div class="card-kpi"><div class="label-kpi">Total Unidades</div><div class="value-kpi">{total_uds}</div><div class="sub-kpi">Cadastradas no Sistema</div></div>', unsafe_allow_html=True)
     
-    perc_global = (abs(perda_consolidada) / faturamento * 100) if faturamento > 0 else 0
-    perc_falta_sobre_perda = (v_falta_total / perda_consolidada * 100) if perda_consolidada != 0 else 0
-    evolucao = (df_filt['is_fin'].sum() / len(df_filt) * 100) if len(df_filt) > 0 else 0
+    with u2: # Card "Finalizadas" com barra e target
+        perc_f = (fechadas/total_uds*100) if total_uds > 0 else 0
+        st.markdown(f'''
+            <div class="card-kpi">
+                <div class="label-kpi">Finalizadas</div>
+                <div class="target-container">
+                    <div class="target-fill" style="width: {perc_f}%;"></div>
+                    <div class="target-line" style="left: {target_pos}%;"></div>
+                    <div class="target-text">{fechadas}</div>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span class="target-label">0</span>
+                    <span class="target-label">today's target</span>
+                    <span class="target-label">{total_uds}</span>
+                </div>
+            </div>
+        ''', unsafe_allow_html=True)
 
-    # Renderização dos Cards (KPIs Superior)
-    k1, k2, k3, k4 = st.columns(4)
-    with k1: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consolidada</div><div class="value-kpi">R$ {perda_consolidada:,.0f}</div><div class="sub-kpi">Financeiro + Mercadoria</div></div>', unsafe_allow_html=True)
-    with k2: st.markdown(f'<div class="card-kpi"><div class="label-kpi">% Perda Global</div><div class="value-kpi">{perc_global:.3f}%</div><div class="sub-kpi">Sobre Faturamento</div></div>', unsafe_allow_html=True)
-    with k3: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Volume Falta</div><div class="value-kpi">R$ {v_falta_total:,.0f}</div><div class="sub-kpi">{abs(perc_falta_sobre_perda):.1f}% do Total de Perdas</div></div>', unsafe_allow_html=True)
-    with k4: st.markdown(f'<div class="card-kpi"><div class="label-kpi">Evolução / Conclusão</div><div class="value-kpi">{evolucao:.1f}%</div><div class="p-bar-bg"><div class="p-bar-fill" style="width:{evolucao}%"></div></div></div>', unsafe_allow_html=True)
-
+    with u3: # Card "Pendentes"
+        perc_p = (pendentes/total_uds*100) if total_uds > 0 else 0
+        st.markdown(f'''
+            <div class="card-kpi">
+                <div class="label-kpi">Pendentes</div>
+                <div class="target-container" style="background: #2a1b1b;">
+                    <div class="target-fill" style="width: {perc_p}%; background: #ff4b4b; box-shadow: 0 0 10px #ff4b4b;"></div>
+                    <div class="target-line" style="left: {target_pos}%; background: #ff4b4b;"></div>
+                    <div class="target-text">{pendentes}</div>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span class="target-label">0</span>
+                    <span class="target-label">today's target</span>
+                    <span class="target-label">{total_uds}</span>
+                </div>
+            </div>
+        ''', unsafe_allow_html=True)
+        
     # --- SEÇÃO DO MEIO: GRÁFICOS (BARRAS ACUMULADO + TREEMAP) ---
     st.markdown("<br>", unsafe_allow_html=True)
     g1, g2 = st.columns([1, 1.1])
