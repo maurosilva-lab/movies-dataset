@@ -4,7 +4,7 @@ import plotly.express as px
 import re
 
 # 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(layout="wide", page_title="Magalog | BI Executive", page_icon="📊")
+st.set_page_config(layout="wide", page_title="Prevenção | BI Executive", page_icon="📊")
 
 # --- ESTILIZAÇÃO CSS (Big Numbers + 6 Cards) ---
 st.markdown("""
