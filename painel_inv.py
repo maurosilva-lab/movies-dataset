@@ -137,25 +137,32 @@ try:
     # --- TABELA FINAL ---
     st.subheader("📋 Detalhamento por Unidade")
     df_tab = df_filt.copy()
+    
+    # 1. Cálculo do % de Perda (Tratando divisão por zero e limpando nulos)
     df_tab['% Perda'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
     df_tab['cd'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
+    
     colunas_show = ['semestre', 'tipo_clean', 'divisional', 'cd', 'local', 'v_1c', '% Perda', 'v_falta', 'is_finalizado']
     df_exibir = df_tab[colunas_show]
 
+    # 4. FUNÇÃO DE ESTILIZAÇÃO (Expandida para Falta Vol)
     def style_performance(row):
         styles = [''] * len(row)
         v1c = row['v_1c']
-        if v1c < 0:
-            bg_color = '#641e1e' 
-            text_color = '#ff9999' 
-        else:
-            bg_color = '#1e4620' 
-            text_color = '#99ff99' 
         
-        idx_v1c = row.index.get_loc('v_1c')
-        idx_perda = row.index.get_loc('% Perda')
-        styles[idx_v1c] = f'background-color: {bg_color}; color: {text_color}; font-weight: bold;'
-        styles[idx_perda] = f'background-color: {bg_color}; color: {text_color}; font-weight: bold;'
+        # Cores de Alerta (Negativo) vs Sucesso (Positivo)
+        if v1c < 0:
+            bg_color = '#641e1e' # Vermelho saturado
+            text_color = '#ff9999' # Rosa claro
+        else:
+            bg_color = '#1e4620' # Verde floresta
+            text_color = '#99ff99' # Verde limão
+
+        # Aplicamos o estilo nas colunas financeiras e de performance
+        for col in ['v_1c', '% Perda', 'v_falta']:
+            idx = row.index.get_loc(col)
+            styles[idx] = f'background-color: {bg_color}; color: {text_color}; font-weight: bold;'
+        
         return styles
 
     st.dataframe(
@@ -165,7 +172,9 @@ try:
             "% Perda": st.column_config.NumberColumn("% Perda", format="%.4f%%"),
             "v_falta": st.column_config.NumberColumn("Falta Vol", format="%.0f"),
             "is_finalizado": st.column_config.CheckboxColumn("Fim?"),
-            "tipo_clean": "Tipo", "cd": "CD", "local": "Unidade"
+            "tipo_clean": "Tipo", 
+            "cd": "CD", 
+            "local": "Unidade"
         },
         use_container_width=True,
         hide_index=True
