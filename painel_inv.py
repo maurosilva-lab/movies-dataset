@@ -113,15 +113,31 @@ try:
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     
     with c1: 
-        st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consolidada</div><div class="value-kpi">R$ {perda_total:,.0f}</div><div class="sub-kpi">1C + Falta Vol</div></div>', unsafe_allow_html=True)
+        # Define o valor do ano anterior
+        perda_2025 = -17928616
+        
+        # Calcula a variação percentual: (Atual - Anterior) / |Anterior| * 100
+        var_perc = ((perda_total - perda_2025) / abs(perda_2025)) * 100 if perda_2025 != 0 else 0
+        
+        # Coloca um sinal de "+" na frente se a variação for positiva para melhor visualização
+        sinal = "+" if var_perc > 0 else ""
+        
+        st.markdown(f'''
+        <div class="card-kpi">
+            <div class="label-kpi">Perda Consolidada</div>
+            <div class="value-kpi">R$ {perda_total:,.0f}</div>
+            <div class="sub-kpi">vs 2025: {sinal}{var_perc:.1f}%</div>
+        </div>
+        ''', unsafe_allow_html=True)
     with c2: 
         st.markdown(f'<div class="card-kpi"><div class="label-kpi">Falta Volume</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">{abs(perc_falta):.1f}% da Perda</div></div>', unsafe_allow_html=True)
     with c3: 
-        # Mantemos o percentual atual e adicionamos o comparativo financeiro de 2025 no sub-kpi
-        st.markdown(f''' <div class="card-kpi">
+        # Retorna ao formato original (sobre faturamento)
+        st.markdown(f'''
+        <div class="card-kpi">
             <div class="label-kpi">% Geral de Perdas</div>
             <div class="value-kpi">{perc_geral_str}</div>
-            <div class="sub-kpi">vs 2025: -R$ 17.928.616</div>
+            <div class="sub-kpi">Sobre Faturamento</div>
         </div>
         ''', unsafe_allow_html=True)
     
