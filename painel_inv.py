@@ -110,50 +110,68 @@ try:
     with k3: st.markdown(f'<div class="card-neon"><div class="label-neon">Volume Falta</div><div class="value-neon">{int(vfal):,}</div><div class="sub-neon">Itens Pendentes</div></div>', unsafe_allow_html=True)
     with k4: st.markdown(f'<div class="card-neon"><div class="label-neon">Evolução</div><div class="value-neon">{concl:.1f}%</div><div class="p-bar-bg"><div class="p-bar-fill" style="width:{concl}%"></div></div></div>', unsafe_allow_html=True)
 
-   # --- SEÇÃO 1: GRÁFICOS DO MEIO (BARRAS + SAÚDE TREEMAP) ---
+  # --- SEÇÃO 1: GRÁFICOS DO MEIO (BARRAS NA ESQUERDA + TREEMAP NA DIREITA) ---
     st.markdown("<br>", unsafe_allow_html=True)
     
-    col_barras, col_saude = st.columns([1, 1.2])
+    # Criamos as colunas e atribuímos explicitamente
+    col_esquerda, col_direita = st.columns([1, 1.2])
 
-    with col_barras:
+    with col_esquerda:
         st.subheader("📊 Top 10 CDs por Perda")
         df_top_cd = df_filt[df_filt['v_1c'] != 0].copy()
         df_top_cd['cd'] = df_top_cd['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-        # Agrupa por CD e soma a perda
+        
+        # Garante a soma por CD e pega os 10 mais negativos
         df_grouped_cd = df_top_cd.groupby('cd')['v_1c'].sum().nsmallest(10).reset_index()
         
         fig_b = px.bar(
-            df_grouped_cd, x='cd', y='v_1c', color='v_1c',
-            color_continuous_scale='Blues_r'
+            df_grouped_cd, x='cd', y='v_1c', 
+            color='v_1c',
+            color_continuous_scale='Blues_r',
+            text_auto='.2s' # Adiciona o valor em cima da barra
         )
         fig_b.update_layout(
-            template="plotly_dark", height=400, margin=dict(t=30, b=0, l=0, r=0),
-            paper_bgcolor='rgba(0,0,0,0)', coloraxis_showscale=False
+            template="plotly_dark", height=400, 
+            margin=dict(t=20, b=0, l=0, r=0),
+            paper_bgcolor='rgba(0,0,0,0)', 
+            plot_bgcolor='rgba(0,0,0,0)',
+            coloraxis_showscale=False
         )
         st.plotly_chart(fig_b, use_container_width=True)
 
-    with col_saude:
+    with col_direita:
         st.subheader("🏢 Saúde por CD (YoY)")
         df_tree = df_filt[df_filt['v_1c'] != 0].copy()
         df_tree['cd'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
         
+        # Gráfico Treemap com configuração de texto forçada
         fig_t = px.treemap(
-            df_tree, path=['divisional', 'cd'], values=df_tree['v_1c'].abs(), 
-            color='v_1c', color_continuous_scale='RdBu_r'
+            df_tree, 
+            path=[px.Constant("Total"), 'divisional', 'cd'], # Adiciona um nível 'Total' para melhor estrutura
+            values=df_tree['v_1c'].abs(), 
+            color='v_1c', 
+            color_continuous_scale='RdBu_r'
         )
+        
+        # ESTA PARTE EXIBE O TEXTO DENTRO DOS QUADRADOS (IGUAL AO PRINT)
+        fig_t.update_traces(
+            textinfo="label+value",
+            texttemplate="<b>%{label}</b><br>R$ %{value:,.0f}",
+            hovertemplate='<b>%{label}</b><br>Perda: R$ %{value:,.2f}'
+        )
+        
         fig_t.update_layout(
-            template="plotly_dark", height=400, margin=dict(t=30, b=10, l=0, r=0),
+            template="plotly_dark", height=400, 
+            margin=dict(t=20, b=10, l=0, r=0),
             paper_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig_t, use_container_width=True)
 
-    # --- SEÇÃO 2: DETALHAMENTO (ESQUERDA) + PIZZA (DIREITA) ---
+    # --- SEÇÃO 2: TABELA E PIZZA (LADO A LADO NA BASE) ---
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Criamos a divisão: 75% para a tabela e 25% para o gráfico lateral
-    col_tabela, col_pizza = st.columns([3, 1.2])
+    col_base_esq, col_base_dir = st.columns([3, 1.2])
 
-    with col_tabela:
+    with col_base_esq:
         st.subheader("📋 Detalhamento Operacional")
         df_tab = df_filt.copy()
         df_tab['v_fat'] = pd.to_numeric(df_tab['v_fat'], errors='coerce').fillna(0)
@@ -162,7 +180,6 @@ try:
         df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd', 'local', 'v_1c', '%', 'v_fal', 'is_fin']]
 
         def styler(row):
-            # Vermelho escuro para negativo, Verde escuro para positivo
             bg = 'background-color: #451a1a;' if row['v_1c'] < 0 else 'background-color: #1a4523;'
             return [bg] * len(row)
 
@@ -174,15 +191,12 @@ try:
                 "v_fal": st.column_config.NumberColumn("Falta", format="%.0f"),
                 "is_fin": "Fim"
             }, 
-            use_container_width=True, 
-            hide_index=True,
-            height=500 
+            use_container_width=True, hide_index=True, height=500 
         )
 
-    with col_pizza:
+    with col_base_dir:
         st.subheader("📍 Perda / Gerência")
         df_p = df_filt[df_filt['divisional'] != "Indefinido"]
-        
         fig_p = px.pie(
             df_p, values=df_p['v_1c'].abs(), names='divisional', hole=0.7, 
             color_discrete_sequence=["#00d2ff", "#008cff", "#0040ff", "#3a7bd5"]
@@ -195,6 +209,3 @@ try:
             legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig_p, use_container_width=True)
-
-except Exception as e:
-    st.error(f"Erro: {e}")
