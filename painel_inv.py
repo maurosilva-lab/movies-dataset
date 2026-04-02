@@ -251,11 +251,11 @@ try:
 
         linhas_html = ""
         for _, row in resumo_tipos.iterrows():
-            # Adicionado um pouco de padding lateral (2px) para os números não grudarem
-            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:2px;'>{row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center; padding:2px;'>{row['Total']}</td><td style='color:#3fb950; text-align:center; padding:2px;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center; padding:2px;'>{row['Pen']}</td></tr>"
+            # Adicionado white-space: nowrap; na primeira coluna para evitar quebra
+            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:2px; white-space: nowrap;'>{row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center; padding:2px;'>{row['Total']}</td><td style='color:#3fb950; text-align:center; padding:2px;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center; padding:2px;'>{row['Pen']}</td></tr>"
 
-        # Adicionado "table-layout: fixed;" e ajustado o tamanho da fonte para 10.5px
-        tabela_html = f"<table style='width:100%; table-layout: fixed; font-size:10.5px; margin-top:0px; border-top:1px solid #30363d; padding-top:4px; border-collapse: collapse;'><thead><tr style='color:#8b949e; text-transform:uppercase; border-bottom:1px solid #30363d;'><th style='text-align:left; padding-bottom:4px; padding-left:2px;'>Tipo</th><th style='text-align:center; padding-bottom:4px;'>Tot</th><th style='text-align:center; padding-bottom:4px;'>Fim</th><th style='text-align:center; padding-bottom:4px; padding-right:2px;'>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table>"
+        # Adicionado white-space: nowrap; em todos os cabeçalhos (Tot, Fim, Pen)
+        tabela_html = f"<table style='width:100%; table-layout: fixed; font-size:10.5px; margin-top:0px; border-top:1px solid #30363d; padding-top:4px; border-collapse: collapse;'><thead><tr style='color:#8b949e; text-transform:uppercase; border-bottom:1px solid #30363d;'><th style='text-align:left; padding-bottom:4px; padding-left:2px;'>Tipo</th><th style='text-align:center; padding-bottom:4px; white-space: nowrap;'>Tot</th><th style='text-align:center; padding-bottom:4px; white-space: nowrap;'>Fim</th><th style='text-align:center; padding-bottom:4px; padding-right:2px; white-space: nowrap;'>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table>"
         
         html_final = f"""<div class="card-kpi" style="{estilo_card}">
             <div style="width: 100%;">
