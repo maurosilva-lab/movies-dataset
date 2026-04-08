@@ -21,9 +21,10 @@ def analisar_e_limpar_dados(df_entrada):
     df = df_entrada.copy()
     df.columns = df.columns.str.strip() 
         
+    # CORREÇÃO DO ".0": Transforma em texto e remove o decimal e espaços
     for col in ['CD_EMPRESA', col_chave, 'DS_PRODUTO', 'DS_AREA_ERP', 'NU_PROCESSO']:
         if col in df.columns:
-            df[col] = df[col].astype(str).str.strip()
+            df[col] = df[col].astype(str).str.replace(r'\.0$', '', regex=True).replace('nan', '').str.strip()
     
     for col in [col_wms, col_erp]:
         if col in df.columns:
@@ -199,8 +200,10 @@ try:
         
         with col_graf_bar:
             df_empresa_sum = df_filtrado.groupby('CD_EMPRESA')['DIFERENCA_ATUAL'].agg('count').reset_index(name='Total_Divergencias')
-            df_top_10 = df_empresa_sum.nlargest(10, 'Total_Divergencias').sort_values(by='Total_Divergencias', ascending=True) # Ordena para o Plotly
-            df_top_10['CD_EMPRESA'] = "Filial " + df_top_10['CD_EMPRESA'].astype(str) # Força ser texto
+            df_top_10 = df_empresa_sum.nlargest(10, 'Total_Divergencias').sort_values(by='Total_Divergencias', ascending=True) 
+            
+            # Garantia extra no gráfico para remover o .0 caso ele apareça
+            df_top_10['CD_EMPRESA'] = "Filial " + df_top_10['CD_EMPRESA'].astype(str).str.replace(r'\.0$', '', regex=True)
             
             fig_bar = px.bar(
                 df_top_10, x='Total_Divergencias', y='CD_EMPRESA', orientation='h',
