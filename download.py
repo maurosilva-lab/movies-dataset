@@ -29,7 +29,7 @@ st.markdown("""
 # ==========================================
 # 2. FUNÇÕES DE CARREGAMENTO E TRATAMENTO
 # ==========================================
-SHEET_ID = "COLOQUE_O_ID_DA_SUA_PLANILHA_AQUI" 
+SHEET_ID = "11-IwzWjgFVKynzDTkqpr4_Fbs4GclKhS7W0KTKms0q4" 
 
 @st.cache_data(ttl=600)
 def carregar_dados():
