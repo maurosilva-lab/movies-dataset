@@ -203,7 +203,7 @@ try:
             df_top_10 = df_empresa_sum.nlargest(10, 'Total_Divergencias').sort_values(by='Total_Divergencias', ascending=True) 
             
             # Garantia extra no gráfico para remover o .0 caso ele apareça
-            df_top_10['CD_EMPRESA'] = "Filial " + df_top_10['CD_EMPRESA'].astype(str).str.replace(r'\.0$', '', regex=True)
+            df_top_10['CD_EMPRESA'] = "CD " + df_top_10['CD_EMPRESA'].astype(str).str.replace(r'\.0$', '', regex=True)
             
             fig_bar = px.bar(
                 df_top_10, x='Total_Divergencias', y='CD_EMPRESA', orientation='h',
