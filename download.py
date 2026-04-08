@@ -21,11 +21,11 @@ st.markdown("""
 # 2. FUNÇÕES DE CARREGAMENTO E TRATAMENTO
 # ==========================================
 # Substitua o ID_AQUI pelo ID da sua planilha copiado no passo 1
-SHEET_ID = "https://docs.google.com/spreadsheets/d/11-IwzWjgFVKynzDTkqpr4_Fbs4GclKhS7W0KTKms0q4/edit?gid=1243680312#gid=1243680312" 
+SHEET_ID = "11-IwzWjgFVKynzDTkqpr4_Fbs4GclKhS7W0KTKms0q4" 
 
 @st.cache_data(ttl=600) # Faz cache dos dados por 10 minutos para não sobrecarregar
 def carregar_dados():
-    url_resultados = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=BigQuery+Results"
+    url_resultados = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=BigQuery Results"
     url_historico = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Historico"
     
     try:
