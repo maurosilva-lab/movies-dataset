@@ -31,26 +31,29 @@ st.markdown("""
 # ==========================================
 SHEET_ID = "11-IwzWjgFVKynzDTkqpr4_Fbs4GclKhS7W0KTKms0q4" 
 
+# TTL de 600 segundos (10 min). Se quiser atualização mais rápida, diminua este valor.
 @st.cache_data(ttl=600)
 def carregar_dados():
-    # Adicionamos o parâmetro decimal para o Pandas entender a vírgula do Sheets
     url_resultados = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=BigQuery+Results"
     url_historico = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Historico"
     
     try:
-        # Lemos o CSV tratando vírgula como decimal (padrão Brasil do seu Sheets)
+        # Lemos os dados
         df_res = pd.read_csv(url_resultados, decimal=',')
         df_hist = pd.read_csv(url_historico)
         
-        # Tratamento de segurança para garantir que tudo seja FLOAT
+        # Tratamento de colunas numéricas
         cols_financeiras = ['VALOR_TOTAL_ESTOQUE_ATUALIZADO', 'QT_ESTOQUE', 'CUSTO_MEDIO', 'CUSTO_PGTO']
-        
         for col in cols_financeiras:
             if col in df_res.columns:
-                # Se ainda houver sujeira de string, limpamos antes de converter
                 if df_res[col].dtype == 'object':
                     df_res[col] = df_res[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df_res[col] = pd.to_numeric(df_res[col], errors='coerce').fillna(0)
+        
+        # Garantir ordem correta do histórico
+        if 'DATA_HORA_ATUALIZACAO' in df_hist.columns:
+            df_hist['DATA_HORA_ATUALIZACAO'] = pd.to_datetime(df_hist['DATA_HORA_ATUALIZACAO'], errors='coerce')
+            df_hist = df_hist.sort_values('DATA_HORA_ATUALIZACAO')
             
         return df_res, df_hist
     except Exception as e:
@@ -74,8 +77,16 @@ def converter_para_excel(df):
 # ==========================================
 # 3. INTERFACE DA APLICAÇÃO (UI)
 # ==========================================
-st.markdown('<p class="main-header">🛸 COMMAND CENTER | ESTOQUE</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Monitoramento de Divergências e Estoque Não Vendável</p>', unsafe_allow_html=True)
+col_header, col_refresh = st.columns([0.85, 0.15])
+
+with col_header:
+    st.markdown('<p class="main-header">🛸 COMMAND CENTER | ESTOQUE</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Monitoramento de Divergências e Estoque Não Vendável</p>', unsafe_allow_html=True)
+
+with col_refresh:
+    if st.button("🔄 ATUALIZAR"):
+        st.cache_data.clear()
+        st.rerun()
 
 with st.spinner('Sincronizando com o BigQuery via Satélite...'):
     df_resultados, df_historico = carregar_dados()
@@ -92,7 +103,7 @@ if df_resultados is not None and not df_resultados.empty:
         qtd_cds = df_resultados['CD_EMPRESA'].nunique() if 'CD_EMPRESA' in df_resultados.columns else 0
         qtd_areas = df_resultados['DS_AREA_ARMAZ'].nunique() if 'DS_AREA_ARMAZ' in df_resultados.columns else 0
         
-        # Formatando valores
+        # Formatando valores para o padrão brasileiro
         valor_formatado = f"R$ {total_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         pecas_formatado = f"{int(total_pecas):,}".replace(",", ".")
         
@@ -110,7 +121,7 @@ if df_resultados is not None and not df_resultados.empty:
             
         st.write("---")
         
-        # ---- LINHA 2: GRÁFICOS (PLOTLY DARK THEME) ----
+        # ---- LINHA 2: GRÁFICOS ----
         c1, c2 = st.columns(2)
         
         with c1:
@@ -127,7 +138,6 @@ if df_resultados is not None and not df_resultados.empty:
             st.subheader("🏢 Top 5 Filiais por Valor Retido (R$)")
             if 'CD_EMPRESA' in df_resultados.columns:
                 df_cd = df_resultados.groupby('CD_EMPRESA')['VALOR_TOTAL_ESTOQUE_ATUALIZADO'].sum().reset_index().sort_values(by='VALOR_TOTAL_ESTOQUE_ATUALIZADO', ascending=True).tail(5)
-                # Garantir que CD é texto para não virar gráfico contínuo
                 df_cd['CD_EMPRESA'] = "Filial " + df_cd['CD_EMPRESA'].astype(str).str.replace(r'\.0$', '', regex=True)
                 fig_cd = px.bar(df_cd, x='VALOR_TOTAL_ESTOQUE_ATUALIZADO', y='CD_EMPRESA', orientation='h',
                                 text_auto='.2s', color='VALOR_TOTAL_ESTOQUE_ATUALIZADO', color_continuous_scale="Tealgrn")
@@ -137,17 +147,20 @@ if df_resultados is not None and not df_resultados.empty:
                 st.plotly_chart(fig_cd, use_container_width=True)
 
     with tab2:
-        # ---- ÁREA DE DOWNLOAD (Design Original) ----
         st.markdown('### 📡 Status da Transmissão')
-        ultimo_registro = df_historico.iloc[-1]
         
-        st.info(f"**Última Atualização:** {ultimo_registro['DATA_HORA_ATUALIZACAO']} | **Status:** {ultimo_registro['STATUS']} | **Linhas:** {ultimo_registro['QTD_LINHAS']}")
+        # Exibe o último registro da aba histórico
+        if df_historico is not None and not df_historico.empty:
+            ultimo_registro = df_historico.iloc[-1]
+            data_obs = ultimo_registro['DATA_HORA_ATUALIZACAO']
+            st.info(f"**Última Atualização:** {data_obs} | **Status:** {ultimo_registro['STATUS']} | **Linhas Processadas:** {ultimo_registro['QTD_LINHAS']}")
         
-        with st.expander("👀 Visualizar matriz bruta dos dados"):
+        with st.expander("👀 Visualizar matriz bruta dos dados (Top 10)"):
             st.dataframe(df_resultados.head(10), use_container_width=True)
             
         st.write("---")
         
+        # Preparação para Download
         df_tratado = limpar_dados_para_excel(df_resultados)
         arquivo_excel = converter_para_excel(df_tratado)
         
