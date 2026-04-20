@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 import plotly.express as px
+import plotly.graph_objects as go
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA E DESIGN (FUTURISTA)
@@ -31,34 +32,44 @@ st.markdown("""
 # ==========================================
 SHEET_ID = "11-IwzWjgFVKynzDTkqpr4_Fbs4GclKhS7W0KTKms0q4" 
 
-# TTL de 600 segundos (10 min). Se quiser atualização mais rápida, diminua este valor.
 @st.cache_data(ttl=600)
 def carregar_dados():
     url_resultados = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=BigQuery+Results"
     url_historico = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Historico"
+    url_hist_valores = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Historico_Valores"
     
     try:
-        # Lemos os dados
+        # Lemos os dados das 3 abas
         df_res = pd.read_csv(url_resultados, decimal=',')
         df_hist = pd.read_csv(url_historico)
+        df_val = pd.read_csv(url_hist_valores, decimal=',')
         
-        # Tratamento de colunas numéricas
+        # Tratamento: Aba Results
         cols_financeiras = ['VALOR_TOTAL_ESTOQUE_ATUALIZADO', 'QT_ESTOQUE', 'CUSTO_MEDIO', 'CUSTO_PGTO']
         for col in cols_financeiras:
             if col in df_res.columns:
                 if df_res[col].dtype == 'object':
                     df_res[col] = df_res[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
                 df_res[col] = pd.to_numeric(df_res[col], errors='coerce').fillna(0)
+                
+        # Tratamento: Aba Historico_Valores (Nova)
+        if 'VALOR_TOTAL_ESTOQUE' in df_val.columns:
+            if df_val['VALOR_TOTAL_ESTOQUE'].dtype == 'object':
+                df_val['VALOR_TOTAL_ESTOQUE'] = df_val['VALOR_TOTAL_ESTOQUE'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
+            df_val['VALOR_TOTAL_ESTOQUE'] = pd.to_numeric(df_val['VALOR_TOTAL_ESTOQUE'], errors='coerce').fillna(0)
+            
+        if 'DATA_HORA' in df_val.columns:
+            df_val['DATA_HORA'] = pd.to_datetime(df_val['DATA_HORA'], format='%d/%m/%Y %H:%M:%S', errors='coerce')
         
-        # Garantir ordem correta do histórico
+        # Garantir ordem correta do histórico de logs
         if 'DATA_HORA_ATUALIZACAO' in df_hist.columns:
             df_hist['DATA_HORA_ATUALIZACAO'] = pd.to_datetime(df_hist['DATA_HORA_ATUALIZACAO'], errors='coerce')
             df_hist = df_hist.sort_values('DATA_HORA_ATUALIZACAO')
             
-        return df_res, df_hist
+        return df_res, df_hist, df_val
     except Exception as e:
         st.error(f"Erro na matriz de dados: {e}")
-        return None, None
+        return None, None, None
 
 def limpar_dados_para_excel(df):
     df_clean = df.copy()
@@ -89,7 +100,7 @@ with col_refresh:
         st.rerun()
 
 with st.spinner('Sincronizando com o BigQuery via Satélite...'):
-    df_resultados, df_historico = carregar_dados()
+    df_resultados, df_historico, df_hist_valores = carregar_dados()
 
 if df_resultados is not None and not df_resultados.empty:
     
@@ -121,7 +132,7 @@ if df_resultados is not None and not df_resultados.empty:
             
         st.write("---")
         
-        # ---- LINHA 2: GRÁFICOS ----
+        # ---- LINHA 2: GRÁFICOS DE ROSCA E BARRAS ----
         c1, c2 = st.columns(2)
         
         with c1:
@@ -145,6 +156,46 @@ if df_resultados is not None and not df_resultados.empty:
                 fig_cd.update_xaxes(title="", showgrid=False)
                 fig_cd.update_yaxes(title="")
                 st.plotly_chart(fig_cd, use_container_width=True)
+
+        st.write("---")
+
+        # ---- LINHA 3: GRÁFICO DE EVOLUÇÃO NEON (A SURPRESA) ----
+        st.subheader("📈 Radar Temporal: Evolução do Capital Retido")
+        if df_hist_valores is not None and not df_hist_valores.empty:
+            
+            # Filtro Interativo
+            filiais_disponiveis = ["Todas as Filiais"] + sorted(df_hist_valores['CD_EMPRESA'].dropna().unique().tolist())
+            filial_selecionada = st.selectbox("Selecione a base de análise:", filiais_disponiveis)
+            
+            # Filtragem do DataFrame
+            df_plot = df_hist_valores.copy()
+            if filial_selecionada != "Todas as Filiais":
+                df_plot = df_plot[df_plot['CD_EMPRESA'] == filial_selecionada]
+            
+            # Agrupar por data (caso existam múltiplos setores na mesma hora/data)
+            df_trend = df_plot.groupby('DATA_HORA')['VALOR_TOTAL_ESTOQUE'].sum().reset_index().sort_values('DATA_HORA')
+            
+            # Gráfico de Área Cyberpunk
+            fig_evol = px.area(df_trend, x='DATA_HORA', y='VALOR_TOTAL_ESTOQUE', markers=True)
+            fig_evol.update_traces(
+                line_color='#00FFC4', 
+                line_width=3,
+                fillcolor='rgba(0, 255, 196, 0.15)', # Preenchimento transparente neon
+                marker=dict(size=8, color='#00B4D8', symbol='diamond') # Pontos de marcação azuis
+            )
+            fig_evol.update_layout(
+                plot_bgcolor="rgba(0,0,0,0)", 
+                paper_bgcolor="rgba(0,0,0,0)", 
+                font_color="#8892B0",
+                xaxis_title="",
+                yaxis_title="Valor Acumulado (R$)",
+                hovermode="x unified",
+                xaxis=dict(showgrid=True, gridcolor='rgba(136, 146, 176, 0.1)'),
+                yaxis=dict(showgrid=True, gridcolor='rgba(136, 146, 176, 0.1)')
+            )
+            st.plotly_chart(fig_evol, use_container_width=True)
+        else:
+            st.info("Aguardando acumulação de dados no histórico para traçar a evolução...")
 
     with tab2:
         st.markdown('### 📡 Status da Transmissão')

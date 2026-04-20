@@ -5,7 +5,7 @@ import plotly.express as px
 import datetime
 
 # --- Configuração da Planilha Google ---
-SHEET_ID = "1zc_0mrYa9Unw64cVXouMkdbRCswoItlqbtaG4Cw-dyA" 
+SHEET_ID = "1GjfNcXngLsT0FKIEBrp4VPRZDmfN_DmuwMzpVa-5D6c/" 
 URL_GOOGLE_SHEETS = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=xlsx"
 
 # -----------------------------------------------------------------------------
