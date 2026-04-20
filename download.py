@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import io
 import plotly.express as px
-import plotly.graph_objects as go
 
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA E DESIGN (FUTURISTA)
@@ -32,6 +31,25 @@ st.markdown("""
 # ==========================================
 SHEET_ID = "11-IwzWjgFVKynzDTkqpr4_Fbs4GclKhS7W0KTKms0q4" 
 
+def tratar_moeda(val):
+    """ Função blindada para limpar formatos financeiros (R$, pontos e vírgulas) """
+    if pd.isna(val): return 0.0
+    if isinstance(val, (int, float)): return float(val)
+    
+    val_str = str(val).replace('R$', '').replace(' ', '').replace('\xa0', '').strip()
+    
+    # Se tem ponto de milhar e vírgula decimal (ex: 3.675.201,65)
+    if '.' in val_str and ',' in val_str:
+        val_str = val_str.replace('.', '').replace(',', '.')
+    # Se tem só vírgula decimal (ex: 348090,23)
+    elif ',' in val_str:
+        val_str = val_str.replace(',', '.')
+        
+    try:
+        return float(val_str)
+    except:
+        return 0.0
+
 @st.cache_data(ttl=600)
 def carregar_dados():
     url_resultados = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=BigQuery+Results"
@@ -39,29 +57,36 @@ def carregar_dados():
     url_hist_valores = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Historico_Valores"
     
     try:
-        # Lemos os dados das 3 abas
-        df_res = pd.read_csv(url_resultados, decimal=',')
+        # Lê bruto, sem forçar decimais, para o nosso tratador fazer o trabalho limpo
+        df_res = pd.read_csv(url_resultados)
         df_hist = pd.read_csv(url_historico)
-        df_val = pd.read_csv(url_hist_valores, decimal=',')
+        df_val = pd.read_csv(url_hist_valores)
+        
+        # Strip em nomes de colunas por segurança
+        df_res.columns = df_res.columns.str.strip()
+        df_hist.columns = df_hist.columns.str.strip()
+        df_val.columns = df_val.columns.str.strip()
         
         # Tratamento: Aba Results
         cols_financeiras = ['VALOR_TOTAL_ESTOQUE_ATUALIZADO', 'QT_ESTOQUE', 'CUSTO_MEDIO', 'CUSTO_PGTO']
         for col in cols_financeiras:
             if col in df_res.columns:
-                if df_res[col].dtype == 'object':
-                    df_res[col] = df_res[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-                df_res[col] = pd.to_numeric(df_res[col], errors='coerce').fillna(0)
+                df_res[col] = df_res[col].apply(tratar_moeda)
                 
         # Tratamento: Aba Historico_Valores (Nova)
         if 'VALOR_TOTAL_ESTOQUE' in df_val.columns:
-            if df_val['VALOR_TOTAL_ESTOQUE'].dtype == 'object':
-                df_val['VALOR_TOTAL_ESTOQUE'] = df_val['VALOR_TOTAL_ESTOQUE'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-            df_val['VALOR_TOTAL_ESTOQUE'] = pd.to_numeric(df_val['VALOR_TOTAL_ESTOQUE'], errors='coerce').fillna(0)
+            df_val['VALOR_TOTAL_ESTOQUE'] = df_val['VALOR_TOTAL_ESTOQUE'].apply(tratar_moeda)
             
         if 'DATA_HORA' in df_val.columns:
-            df_val['DATA_HORA'] = pd.to_datetime(df_val['DATA_HORA'], format='%d/%m/%Y %H:%M:%S', errors='coerce')
-        
-        # Garantir ordem correta do histórico de logs
+            # dayfirst=True garante que o Pandas entenda dia/mês/ano corretamente
+            df_val['DATA_HORA'] = pd.to_datetime(df_val['DATA_HORA'], dayfirst=True, errors='coerce')
+            
+        # Forçar a empresa a ser tratada como Texto, removendo ".0" do final
+        if 'CD_EMPRESA' in df_val.columns:
+            df_val['CD_EMPRESA'] = df_val['CD_EMPRESA'].astype(str).str.replace(r'\.0$', '', regex=True)
+        if 'CD_EMPRESA' in df_res.columns:
+            df_res['CD_EMPRESA'] = df_res['CD_EMPRESA'].astype(str).str.replace(r'\.0$', '', regex=True)
+            
         if 'DATA_HORA_ATUALIZACAO' in df_hist.columns:
             df_hist['DATA_HORA_ATUALIZACAO'] = pd.to_datetime(df_hist['DATA_HORA_ATUALIZACAO'], errors='coerce')
             df_hist = df_hist.sort_values('DATA_HORA_ATUALIZACAO')
@@ -149,7 +174,7 @@ if df_resultados is not None and not df_resultados.empty:
             st.subheader("🏢 Top 5 Filiais por Valor Retido (R$)")
             if 'CD_EMPRESA' in df_resultados.columns:
                 df_cd = df_resultados.groupby('CD_EMPRESA')['VALOR_TOTAL_ESTOQUE_ATUALIZADO'].sum().reset_index().sort_values(by='VALOR_TOTAL_ESTOQUE_ATUALIZADO', ascending=True).tail(5)
-                df_cd['CD_EMPRESA'] = "Filial " + df_cd['CD_EMPRESA'].astype(str).str.replace(r'\.0$', '', regex=True)
+                df_cd['CD_EMPRESA'] = "Filial " + df_cd['CD_EMPRESA']
                 fig_cd = px.bar(df_cd, x='VALOR_TOTAL_ESTOQUE_ATUALIZADO', y='CD_EMPRESA', orientation='h',
                                 text_auto='.2s', color='VALOR_TOTAL_ESTOQUE_ATUALIZADO', color_continuous_scale="Tealgrn")
                 fig_cd.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="#8892B0", coloraxis_showscale=False)
@@ -159,8 +184,10 @@ if df_resultados is not None and not df_resultados.empty:
 
         st.write("---")
 
-        # ---- LINHA 3: GRÁFICO DE EVOLUÇÃO NEON (A SURPRESA) ----
+        # ---- LINHA 3: GRÁFICO DE EVOLUÇÃO NEON ----
         st.subheader("📈 Radar Temporal: Evolução do Capital Retido")
+        st.caption("*(Nota: Uma linha evolutiva surgirá assim que o robô realizar as próximas coletas de histórico)*")
+        
         if df_hist_valores is not None and not df_hist_valores.empty:
             
             # Filtro Interativo
@@ -180,8 +207,8 @@ if df_resultados is not None and not df_resultados.empty:
             fig_evol.update_traces(
                 line_color='#00FFC4', 
                 line_width=3,
-                fillcolor='rgba(0, 255, 196, 0.15)', # Preenchimento transparente neon
-                marker=dict(size=8, color='#00B4D8', symbol='diamond') # Pontos de marcação azuis
+                fillcolor='rgba(0, 255, 196, 0.15)',
+                marker=dict(size=8, color='#00B4D8', symbol='diamond')
             )
             fig_evol.update_layout(
                 plot_bgcolor="rgba(0,0,0,0)", 
