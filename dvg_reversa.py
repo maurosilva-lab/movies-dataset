@@ -190,32 +190,28 @@ if df_h is not None and df_r is not None:
     # ==========================================
     with tab1:
         st.write("#### Tendência Diária de Risco")
-        df_evol = df_h_f.groupby([df_h_f['DATA_HORA'].dt.date, 'RUA'])['VALOR_TOTAL_ESTOQUE'].sum().reset_index()
-        fig_evol = px.line(df_evol, x='DATA_HORA', y='VALOR_TOTAL_ESTOQUE', color='RUA', markers=True,
+        
+        # 1. Isola apenas a data (sem a hora)
+        df_h_f['DATA'] = df_h_f['DATA_HORA'].dt.date
+        
+        # 2. O PULO DO GATO: Pega apenas a ÚLTIMA foto de estoque de cada dia, de cada filial e de cada rua.
+        # Isso impede que os valores sejam multiplicados se o script rodar várias vezes no mesmo dia.
+        df_h_unica = df_h_f.sort_values('DATA_HORA').drop_duplicates(subset=['DATA', 'BRANCH_ID', 'RUA'], keep='last')
+        
+        # 3. Agora sim, agrupa de forma segura
+        df_evol = df_h_unica.groupby(['DATA', 'RUA'])['VALOR_TOTAL_ESTOQUE'].sum().reset_index()
+        
+        fig_evol = px.line(df_evol, x='DATA', y='VALOR_TOTAL_ESTOQUE', color='RUA', markers=True,
                            color_discrete_map={'DVG': '#EF4444', 'FIN': '#F59E0B', 'CTE': '#3B82F6', 'SNT': '#8B5CF6'})
         
         fig_evol.update_layout(**layout_transp, hovermode="x unified")
         fig_evol.update_xaxes(dtick="D1", tickformat="%d/%m", title="", showgrid=False)
         fig_evol.update_yaxes(title="Valor em Estoque (R$)", gridcolor="#1E293B")
-        fig_evol.update_traces(line_shape='spline', marker=dict(size=8))
-        st.plotly_chart(fig_evol, use_container_width=True)
         
-        st.write("---")
-        st.write("#### 📦 Posição Atual por Rua")
+        # 4. Removido o 'spline' para evitar as barrigas negativas (linhas retas são mais fiéis para finanças)
+        fig_evol.update_traces(marker=dict(size=8))
         
-        df_d_f['RUA'] = df_d_f['RUA'].astype(str).str.strip().str.upper()
-        col_vlr_rua = 'BALBOA_CMUP' if 'BALBOA_CMUP' in df_d_f.columns else 'VALOR_TOTAL_ESTOQUE_ATUALIZADO'
-        df_rua = df_d_f.groupby('RUA').agg(QTD_PECAS=('RUA', 'count'), VALOR_TOTAL_ESTOQUE=(col_vlr_rua, 'sum')).reset_index()
-        
-        st.dataframe(
-            df_rua.sort_values('VALOR_TOTAL_ESTOQUE', ascending=False),
-            column_config={
-                "RUA": "Status / Rua",
-                "QTD_PECAS": st.column_config.NumberColumn("Qtd Peças", format="%d un"),
-                "VALOR_TOTAL_ESTOQUE": st.column_config.NumberColumn("Custo Acumulado", format="R$ %.2f")
-            },
-            width="stretch", hide_index=True 
-        )
+        st.plotly_chart(fig_evol, width="stretch")
 
    # ==========================================
     # TAB 2: GRÁFICO OTIMIZADO (SOMENTE DVG E FIN)
