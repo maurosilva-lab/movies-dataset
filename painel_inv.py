@@ -6,32 +6,35 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Prevenção | BI Executive", page_icon="📊")
 
-# --- ESTILIZAÇÃO CSS (Correção de Layout e Profundidade) ---
+# --- ESTILIZAÇÃO CSS (Layout Corrigido) ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
     .main { padding: 0rem !important; }
-    .block-container { padding-top: 2.5rem !important; padding-bottom: 1rem !important; }
+    .block-container { padding-top: 1.5rem !important; padding-bottom: 1rem !important; }
     
+    /* Aumentei o padding inferior da barra azul para os cards não cobrirem o texto */
     .header-box {
         background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
-        padding: 1rem; border-radius: 0 0 15px 15px; text-align: center;
+        padding: 2rem 1rem 5rem 1rem; 
+        border-radius: 0 0 15px 15px; text-align: center;
         box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
         position: relative; z-index: 1;
     }
-    .header-title { color: white !important; font-size: 26px !important; font-weight: 800 !important; margin:0; }
+    .header-title { color: white !important; font-size: 28px !important; font-weight: 900 !important; margin:0; text-transform: uppercase; }
 
+    /* Reduzi a margem negativa para um encaixe mais elegante */
     .card-kpi {
         background: #161b22; border: 1px solid #30363d;
         border-radius: 12px; padding: 10px; text-align: center;
         border-bottom: 4px solid #00d2ff;
-        margin-top: -105px; 
-        height: 155px; display: flex; flex-direction: column; 
+        margin-top: -60px; 
+        height: 140px; display: flex; flex-direction: column; 
         justify-content: center; align-items: center; box-sizing: border-box;
-        position: relative; z-index: 100; /* Garante que fique na frente */
+        position: relative; z-index: 100;
     }
     .label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
-    .value-kpi { color: #f0f6fc; font-size: 20px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; }
+    .value-kpi { color: #f0f6fc; font-size: 21px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; }
     .sub-kpi { color: #00d2ff; font-size: 11px; font-weight: 500; }
     </style>
 """, unsafe_allow_html=True)
@@ -63,7 +66,10 @@ def load_data():
 try:
     df_raw = load_data().copy()
     
-    # Mapeamento Dinâmico de Colunas
+    # Identifica dinamicamente a coluna de Unidade ou CD (Garante que não dê erro de Index)
+    col_unidade = next((c for c in df_raw.columns if c in ['cd', 'unidade']), df_raw.columns[0])
+    
+    # Mapeamento Dinâmico de Colunas de Valores
     c_total = next((c for c in df_raw.columns if 'total_custo_inv' in c), None)
     c_falta = next((c for c in df_raw.columns if 'falta_vol' in c), None)
     c_trans = next((c for c in df_raw.columns if 'transporte' in c), None)
@@ -77,10 +83,10 @@ try:
     df_raw['v_sac']   = df_raw[c_sac].apply(limpar_valor) if c_sac else 0.0
     df_raw['v_fat']   = df_raw[c_fat].apply(limpar_valor) if c_fat else 0.0
 
-    # LÓGICA SOLICITADA: Consolidado = Total + Falta
+    # LÓGICA DO CONSOLIDADO: Total Custo + Falta Volume
     df_raw['v_consolidado'] = df_raw['v_total'] + df_raw['v_falta']
 
-    st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO INV PREVENÇAO DE PERDAS 2026</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO INV PREVENÇÃO DE PERDAS 2026</p></div>', unsafe_allow_html=True)
 
     # Cálculos Globais
     total_cons = df_raw['v_consolidado'].sum()
@@ -129,11 +135,13 @@ try:
 
     with g2:
         st.subheader("📋 Detalhamento da Base")
-        df_exib = df_raw[['unidade', 'v_total', 'v_falta', 'v_consolidado', 'v_trans', 'v_sac']].copy()
+        # Correção do erro vermelho: Usa col_unidade dinamicamente
+        df_exib = df_raw[[col_unidade, 'v_total', 'v_falta', 'v_consolidado', 'v_trans', 'v_sac']].copy()
+        
         st.dataframe(
             df_exib,
             column_config={
-                "unidade": "ID",
+                col_unidade: "ID / UNIDADE",
                 "v_total": st.column_config.NumberColumn("TOTAL CUSTO", format="R$ %.2f"),
                 "v_falta": st.column_config.NumberColumn("FALTA VOL", format="R$ %.2f"),
                 "v_consolidado": st.column_config.NumberColumn("CONSOLIDADO", format="R$ %.2f"),
@@ -144,4 +152,4 @@ try:
         )
 
 except Exception as e:
-    st.error(f"Erro ao processar dados: {e}")
+    st.error(f"⚠️ Erro ao processar dados: {e}")
