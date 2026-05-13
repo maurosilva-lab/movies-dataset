@@ -104,14 +104,14 @@ try:
     st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO INV PREVENÇAO DE PERDAS 2026</p></div>', unsafe_allow_html=True)
 
     # CÁLCULOS TOTAIS
-    p1c = df_filt['v_1c'].sum()
+    p1c = df_filt['v_1c'].sum() # Esta é a sua coluna principal (Total_Custo inv / 1º ciclo)
     vfal = df_filt['v_falta_real'].sum()
     vtransp = df_filt['v_transp'].sum()
     vsac = df_filt['v_sac'].sum()
     vfat_total = df_filt['v_fat'].sum()
     
-    # Mantendo a função base mas agregando os novos custos lidos
-    perda_total = p1c + vfal + vtransp + vsac
+    # CORREÇÃO: Perda Consolidada soma APENAS a coluna Total_Custo inv (p1c)
+    perda_total = p1c 
     
     # Porcentagens semelhantes ao card Falta Volume
     perc_falta = (vfal / perda_total * 100) if perda_total != 0 else 0
