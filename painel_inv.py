@@ -21,7 +21,7 @@ st.markdown("""
     .header-box {
         background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
         padding: 1rem; border-radius: 0 0 15px 15px; text-align: center;
-        margin-bottom: 0px !important; 
+        margin-bottom: 25px !important; /* <-- AJUSTADO: Espaço para empurrar os cards para baixo */
         box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
         position: relative;
         z-index: 99;
@@ -32,10 +32,10 @@ st.markdown("""
         background: #161b22; border: 1px solid #30363d;
         border-radius: 12px; padding: 15px; text-align: center;
         border-bottom: 4px solid #00d2ff;
-        margin-top: -105px; 
+        margin-top: 0px; /* <-- CORRIGIDO: Removido o -105px que jogava os cards para trás do título */
     }
     .label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
-    .value-kpi { color: #f0f6fc; font-size: 22px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; } /* Ajustado tamanho da fonte para caber */
+    .value-kpi { color: #f0f6fc; font-size: 22px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; }
     .sub-kpi { color: #00d2ff; font-size: 11px; font-weight: 500; }
     </style>
 """, unsafe_allow_html=True)
