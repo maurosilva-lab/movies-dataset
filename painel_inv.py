@@ -267,8 +267,11 @@ try:
     with g1:
         st.subheader("📊 Resultado Consolidado")
         df_proc = df_filt.copy()
-        # Atualizado para somar a perda real consolidada (Falta volume garantida que só processa no CD)
-        df_proc['res_total'] = df_proc['v_1c'] + df_proc['v_falta_real'] + df_proc['v_transp'] + df_proc['v_sac']
+        
+        # CORREÇÃO: O gráfico agora reflete EXATAMENTE o valor da coluna Total_Custo inv (mapeada como v_1c),
+        # sem somar transporte, sac ou falta volume extra.
+        df_proc['res_total'] = df_proc['v_1c'] 
+        
         df_plot = df_proc.groupby('tipo_clean')['res_total'].sum().reset_index()
         fig_b = px.bar(df_plot, x='tipo_clean', y=df_plot['res_total'].abs(), text='res_total', color='tipo_clean', 
                        color_discrete_map={'CD':'#3a7bd5','LV':'#7000ff','DQS':'#00f2ff'})
