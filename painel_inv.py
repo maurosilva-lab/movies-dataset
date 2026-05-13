@@ -12,7 +12,6 @@ st.markdown("""
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
     .main { padding: 0rem !important; }
     
-    /* --- AQUI ESTÁ O AJUSTE FINO DO TOPO --- */
     .block-container {
         padding-top: 2.5rem !important; 
         padding-bottom: 1rem !important;
@@ -21,7 +20,7 @@ st.markdown("""
     .header-box {
         background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
         padding: 1rem; border-radius: 0 0 15px 15px; text-align: center;
-        margin-bottom: 25px !important; /* <-- AJUSTADO: Espaço para empurrar os cards para baixo */
+        margin-bottom: 25px !important; 
         box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
         position: relative;
         z-index: 99;
@@ -32,7 +31,7 @@ st.markdown("""
         background: #161b22; border: 1px solid #30363d;
         border-radius: 12px; padding: 15px; text-align: center;
         border-bottom: 4px solid #00d2ff;
-        margin-top: 0px; /* <-- CORRIGIDO: Removido o -105px que jogava os cards para trás do título */
+        margin-top: 0px; 
     }
     .label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
     .value-kpi { color: #f0f6fc; font-size: 22px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; }
@@ -42,8 +41,10 @@ st.markdown("""
 
 # --- FUNÇÕES ---
 def limpar_valor(v):
-    if pd.isna(v) or str(v).strip() in ["", "-", "nan"]: return 0.0
-    val = str(v).replace('R$', '').replace(' ', '').replace('.', '').replace(',', '.')
+    # TRATAMENTO ATUALIZADO: Ignora o #N/D que vem do sheets
+    if pd.isna(v) or str(v).strip() in ["", "-", "nan", "#N/D", "#N/A"]: return 0.0
+    val = str(v).upper().replace('R$', '').replace('\xA0', '').replace(' ', '')
+    val = val.replace('.', '').replace(',', '.')
     val = re.sub(r'[^0-9\.\-]', '', val)
     try: return float(val)
     except: return 0.0
@@ -70,8 +71,8 @@ try:
     df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
     df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional)
     
-    # Capturando as colunas dinamicamente
-    c_1c = next((c for c in df_raw.columns if '1__ciclo' in c), None)
+    # ATUALIZADO: Capturando a coluna nova ('total_custo') ao invés do 1º ciclo
+    c_1c = next((c for c in df_raw.columns if 'total_custo' in c), None)
     c_fat = next((c for c in df_raw.columns if 'faturamento' in c), None)
     c_fal = next((c for c in df_raw.columns if 'falta_vol' in c), None)
     c_trans = next((c for c in df_raw.columns if 'transporte' in c), None)
@@ -104,16 +105,15 @@ try:
     st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO INV PREVENÇAO DE PERDAS 2026</p></div>', unsafe_allow_html=True)
 
     # CÁLCULOS TOTAIS
-    p1c = df_filt['v_1c'].sum() # Esta é a sua coluna principal (Total_Custo inv / 1º ciclo)
+    p1c = df_filt['v_1c'].sum() # Puxa direto do Total_Custo inv
     vfal = df_filt['v_falta_real'].sum()
     vtransp = df_filt['v_transp'].sum()
     vsac = df_filt['v_sac'].sum()
     vfat_total = df_filt['v_fat'].sum()
     
-    # CORREÇÃO: Perda Consolidada soma APENAS a coluna Total_Custo inv (p1c)
+    # Perda Consolidada é apenas o valor original (Total_Custo inv) para não duplicar somas
     perda_total = p1c 
     
-    # Porcentagens semelhantes ao card Falta Volume
     perc_falta = (vfal / perda_total * 100) if perda_total != 0 else 0
     perc_transp = (vtransp / perda_total * 100) if perda_total != 0 else 0
     perc_sac = (vsac / perda_total * 100) if perda_total != 0 else 0
@@ -124,7 +124,6 @@ try:
     total_uds = len(df_filt)
     fechadas = df_filt['is_fin'].sum()
     pendentes = total_uds - fechadas
-    target_pos = 70
 
     # --- CÁLCULO DINÂMICO DE COMPARAÇÃO COM 2025 ---
     dados_2025 = pd.DataFrame([
@@ -162,11 +161,8 @@ try:
     else:
         texto_var = "Igual a 2025"
 
-
     # --- 7 CARDS KPI ---
-    # Layout responsivo: peso maior para a tabela (último índice) caber direitinho
     c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1, 1, 1.4])
-    
     estilo_card = "height: 160px; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;"
 
     with c1: 
@@ -259,7 +255,6 @@ try:
 
         st.markdown(html_final, unsafe_allow_html=True)
 
-
     # --- GRÁFICOS DO MEIO ---
     st.markdown("<br>", unsafe_allow_html=True)
     g1, g2 = st.columns([1, 1.1])
@@ -268,13 +263,13 @@ try:
         st.subheader("📊 Resultado Consolidado")
         df_proc = df_filt.copy()
         
-        # CORREÇÃO: O gráfico agora reflete EXATAMENTE o valor da coluna Total_Custo inv (mapeada como v_1c),
-        # sem somar transporte, sac ou falta volume extra.
+        # O gráfico agora usa direto a coluna Total_Custo
         df_proc['res_total'] = df_proc['v_1c'] 
         
         df_plot = df_proc.groupby('tipo_clean')['res_total'].sum().reset_index()
         fig_b = px.bar(df_plot, x='tipo_clean', y=df_plot['res_total'].abs(), text='res_total', color='tipo_clean', 
-                       color_discrete_map={'CD':'#3a7bd5','LV':'#7000ff','DQS':'#00f2ff'})
+                       # CROSS agora tem a própria cor Laranja
+                       color_discrete_map={'CD':'#3a7bd5','LV':'#7000ff','DQS':'#00f2ff', 'CROSS':'#ff8c00'})
         fig_b.update_traces(texttemplate='R$ %{text:,.0f}', textposition='outside')
         fig_b.update_layout(template="plotly_dark", height=380, showlegend=False, yaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig_b, use_container_width=True)
@@ -284,7 +279,8 @@ try:
         df_tree = df_filt[df_filt['v_1c'] != 0].copy()
         df_tree['cd_lbl'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
         fig_t = px.treemap(df_tree, path=['tipo_clean', 'cd_lbl'], values=df_tree['v_1c'].abs(), color='tipo_clean', 
-                           color_discrete_map={'CD':'#0040ff','LV':'#aa00ff','DQS':'#00d2ff'})
+                           # CROSS aqui também no Treemap
+                           color_discrete_map={'CD':'#0040ff','LV':'#aa00ff','DQS':'#00d2ff', 'CROSS':'#ff8c00'})
         fig_t.update_traces(textinfo="label+value", texttemplate="<b>%{label}</b><br>R$ %{value:,.0f}")
         fig_t.update_layout(template="plotly_dark", height=380, margin=dict(t=20, b=10, l=0, r=0))
         st.plotly_chart(fig_t, use_container_width=True)
@@ -298,7 +294,6 @@ try:
         df_tab['%'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
         df_tab['cd_t'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
         
-        # Colunas extras adicionadas na visualização final
         df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd_t', 'local', 'v_1c', '%', 'v_falta_real', 'v_transp', 'v_sac', 'is_fin']]
         
         st.dataframe(
@@ -323,7 +318,7 @@ try:
     with b2:
         st.subheader("📍 Perda / Gerente")
         df_pi = df_filt[df_filt['divisional'] != "Indefinido"]
-        fig_pi = px.pie(df_pi, values=df_pi['v_1c'].abs(), names='divisional', hole=0.7, color_discrete_sequence=["#00d2ff", "#008cff", "#0040ff", "#3a7bd5"])
+        fig_pi = px.pie(df_pi, values=df_pi['v_1c'].abs(), names='divisional', hole=0.7, color_discrete_sequence=["#00d2ff", "#008cff", "#0040ff", "#3a7bd5", "#ff8c00"])
         fig_pi.update_layout(template="plotly_dark", height=450, margin=dict(t=50, b=50, l=0, r=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
         st.plotly_chart(fig_pi, use_container_width=True)
 
