@@ -6,26 +6,32 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Prevenção | BI Executive", page_icon="📊")
 
-# --- ESTILIZAÇÃO CSS CORRIGIDA ---
+# --- ESTILIZAÇÃO CSS ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
     .main { padding: 0rem !important; }
-    .block-container { padding-top: 2.5rem !important; padding-bottom: 1rem !important; }
+    
+    .block-container {
+        padding-top: 2.5rem !important; 
+        padding-bottom: 1rem !important;
+    }
     
     .header-box {
         background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
         padding: 1rem; border-radius: 0 0 15px 15px; text-align: center;
         margin-bottom: 25px !important; 
         box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
-        position: relative; z-index: 99;
+        position: relative;
+        z-index: 99;
     }
     .header-title { color: white !important; font-size: 26px !important; font-weight: 800 !important; margin:0; }
 
     .card-kpi {
         background: #161b22; border: 1px solid #30363d;
         border-radius: 12px; padding: 15px; text-align: center;
-        border-bottom: 4px solid #00d2ff; margin-top: 0px; 
+        border-bottom: 4px solid #00d2ff;
+        margin-top: 0px; 
     }
     .label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
     .value-kpi { color: #f0f6fc; font-size: 22px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; }
@@ -33,26 +39,22 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE LIMPEZA ROBUSTAS ---
+# --- FUNÇÕES ---
 def limpar_valor(v):
-    if pd.isna(v): return 0.0
-    s = str(v).strip().upper()
-    if s in ["", "-", "NAN", "#N/D", "#N/A"]: return 0.0
+    # TRATAMENTO CORRIGIDO PARA FORMATOS BRASILEIROS E #N/D
+    if pd.isna(v) or str(v).strip() in ["", "-", "nan", "#N/D", "#N/A"]: return 0.0
+    val = str(v).upper().replace('R$', '').replace('\xA0', '').replace(' ', '')
     
-    # Remove R$, espaços e caracteres invisíveis
-    s = s.replace('R$', '').replace(' ', '').replace('\xa0', '')
-    
-    # Lógica para tratar formatos brasileiros (-1.234,56) e americanos (-1234.56)
-    if ',' in s and '.' in s:
-        s = s.replace('.', '') # Remove separador de milhar
-        s = s.replace(',', '.') # Transforma decimal em ponto
-    elif ',' in s:
-        s = s.replace(',', '.')
+    # Se tiver ponto e vírgula (ex: -12.683,59), tira o ponto e troca vírgula por ponto
+    if '.' in val and ',' in val:
+        val = val.replace('.', '')
+        val = val.replace(',', '.')
+    # Se tiver só vírgula (ex: -123,45), troca por ponto
+    elif ',' in val:
+        val = val.replace(',', '.')
         
-    # Remove qualquer coisa que não seja número, ponto ou sinal de menos
-    s = re.sub(r'[^0-9\.\-]', '', s)
-    
-    try: return float(s)
+    val = re.sub(r'[^0-9\.\-]', '', val)
+    try: return float(val)
     except: return 0.0
 
 def mapear_divisional(cd):
@@ -74,10 +76,9 @@ def load_data():
 
 try:
     df_raw = load_data().copy()
-    df_raw['tipo_clean'] = df_raw['tipo'].fillna('OUTROS').astype(str).str.upper().str.strip()
+    df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
     df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional)
     
-    # Mapeamento de colunas
     c_1c = next((c for c in df_raw.columns if 'total_custo' in c), None)
     c_fat = next((c for c in df_raw.columns if 'faturamento' in c), None)
     c_fal = next((c for c in df_raw.columns if 'falta_vol' in c), None)
@@ -89,13 +90,12 @@ try:
     df_raw['v_falta'] = df_raw[c_fal].apply(limpar_valor) if c_fal else 0.0
     df_raw['v_transp'] = df_raw[c_trans].apply(limpar_valor) if c_trans else 0.0
     df_raw['v_sac'] = df_raw[c_sac].apply(limpar_valor) if c_sac else 0.0
-    
-    # IMPORTANTE: is_fin agora aceita valores negativos (como o do CROSS)
     df_raw['is_fin'] = df_raw['v_1c'] != 0
 
     with st.sidebar:
         st.header("⚙️ Gerenciamento")
         if st.button("🔄 Atualizar Dados"): st.cache_data.clear(); st.rerun()
+        
         s_sel = st.multiselect("Filtrar Semestre", options=sorted(df_raw['semestre'].dropna().unique())) if 'semestre' in df_raw.columns else []
         t_sel = st.multiselect("Filtrar por Tipo", options=sorted(df_raw['tipo_clean'].unique()))
         d_sel = st.multiselect("Filtrar Gerente", options=sorted([x for x in df_raw['divisional'].unique() if x != "Indefinido"]))
@@ -107,53 +107,173 @@ try:
 
     df_filt['v_falta_real'] = df_filt.apply(lambda x: x['v_falta'] if x['tipo_clean'] == 'CD' else 0.0, axis=1)
 
+    # --- UI PRINCIPAL ---
     st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO INV PREVENÇAO DE PERDAS 2026</p></div>', unsafe_allow_html=True)
 
-    # CÁLCULOS
-    p1c = df_filt['v_1c'].sum()
+    # CÁLCULOS TOTAIS
+    p1c = df_filt['v_1c'].sum() 
     vfal = df_filt['v_falta_real'].sum()
     vtransp = df_filt['v_transp'].sum()
     vsac = df_filt['v_sac'].sum()
     vfat_total = df_filt['v_fat'].sum()
     
     perda_total = p1c 
+    
     perc_falta = (vfal / perda_total * 100) if perda_total != 0 else 0
     perc_transp = (vtransp / perda_total * 100) if perda_total != 0 else 0
     perc_sac = (vsac / perda_total * 100) if perda_total != 0 else 0
+    
     perc_geral_perdas = (perda_total / vfat_total * 100) if vfat_total != 0 else 0
+    perc_geral_str = f"{perc_geral_perdas:.3f}".replace('.', ',') + "%"
     
     total_uds = len(df_filt)
     fechadas = df_filt['is_fin'].sum()
-    perc_finalizadas = (fechadas / total_uds * 100) if total_uds > 0 else 0
+    pendentes = total_uds - fechadas
+
+    # --- CÁLCULO DINÂMICO DE COMPARAÇÃO COM 2025 ---
+    dados_2025 = pd.DataFrame([
+        {'tipo': 'CD', 'semestre': '1º semestre', 'valor': 9415271},
+        {'tipo': 'CD', 'semestre': '2º semestre', 'valor': 5379088},
+        {'tipo': 'CROSS', 'semestre': '1º semestre', 'valor': 2183},
+        {'tipo': 'CROSS', 'semestre': '2º semestre', 'valor': 1633},
+        {'tipo': 'DQS', 'semestre': '1º semestre', 'valor': 269835},
+        {'tipo': 'DQS', 'semestre': '2º semestre', 'valor': -268613},
+        {'tipo': 'LV', 'semestre': '1º semestre', 'valor': 619830},
+        {'tipo': 'LV', 'semestre': '2º semestre', 'valor': 2509390}
+    ])
+
+    tipos_presentes = df_filt['tipo_clean'].unique()
+    
+    if 'semestre' in df_filt.columns:
+        semestres_presentes = df_filt['semestre'].astype(str).str.lower().str.strip().unique()
+        dados_2025['semestre_clean'] = dados_2025['semestre'].str.lower().str.strip()
+        df_2025_filt = dados_2025[(dados_2025['tipo'].isin(tipos_presentes)) & (dados_2025['semestre_clean'].isin(semestres_presentes))]
+    else:
+        df_2025_filt = dados_2025[dados_2025['tipo'].isin(tipos_presentes)]
+
+    perda_2025_abs = df_2025_filt['valor'].sum()
+    perda_total_abs = abs(perda_total)
+    
+    if perda_2025_abs != 0:
+        var_perc = ((perda_total_abs - perda_2025_abs) / abs(perda_2025_abs)) * 100
+    else:
+        var_perc = 0
+
+    if var_perc < 0:
+        texto_var = f'<span style="color:#3fb950; font-weight:bold;">▼ {abs(var_perc):.1f}% (Redução)</span> vs 2025'
+    elif var_perc > 0:
+        texto_var = f'<span style="color:#ff4b4b; font-weight:bold;">▲ {var_perc:.1f}% (Aumento)</span> vs 2025'
+    else:
+        texto_var = "Igual a 2025"
 
     # --- 7 CARDS KPI ---
     c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1, 1, 1.4])
     estilo_card = "height: 160px; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;"
 
-    with c1: st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div class="label-kpi">Perda Consol.</div><div class="value-kpi">R$ {perda_total:,.0f}</div></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div class="label-kpi">Falta Volume</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">{abs(perc_falta):.1f}% da Perda</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div class="label-kpi">Transporte</div><div class="value-kpi">R$ {vtransp:,.0f}</div><div class="sub-kpi">{abs(perc_transp):.1f}% da Perda</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div class="label-kpi">SAC</div><div class="value-kpi">R$ {vsac:,.0f}</div><div class="sub-kpi">{abs(perc_sac):.1f}% da Perda</div></div>', unsafe_allow_html=True)
-    with c5: st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div class="label-kpi">% Geral Perdas</div><div class="value-kpi">{perc_geral_perdas:.3f}%</div><div class="sub-kpi">Sobre Fat.</div></div>', unsafe_allow_html=True)
-    with c6: st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div class="label-kpi">Total UDs</div><div class="value-kpi">{total_uds}</div><div class="sub-kpi">{perc_finalizadas:.1f}% Fin.</div></div>', unsafe_allow_html=True)
+    with c1: 
+        st.markdown(f'''
+        <div class="card-kpi" style="{estilo_card}">
+            <div style="width: 100%;">
+                <div class="label-kpi">Perda Consol.</div>
+                <div class="value-kpi">R$ {perda_total:,.0f}</div>
+                <div class="sub-kpi">{texto_var}</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+    with c2: 
+        st.markdown(f'''
+        <div class="card-kpi" style="{estilo_card}">
+            <div style="width: 100%;">
+                <div class="label-kpi">Falta Volume</div>
+                <div class="value-kpi">R$ {vfal:,.0f}</div>
+                <div class="sub-kpi">{abs(perc_falta):.1f}% da Perda</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+
+    with c3: 
+        st.markdown(f'''
+        <div class="card-kpi" style="{estilo_card}">
+            <div style="width: 100%;">
+                <div class="label-kpi">Transporte</div>
+                <div class="value-kpi">R$ {vtransp:,.0f}</div>
+                <div class="sub-kpi">{abs(perc_transp):.1f}% da Perda</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+
+    with c4: 
+        st.markdown(f'''
+        <div class="card-kpi" style="{estilo_card}">
+            <div style="width: 100%;">
+                <div class="label-kpi">SAC</div>
+                <div class="value-kpi">R$ {vsac:,.0f}</div>
+                <div class="sub-kpi">{abs(perc_sac):.1f}% da Perda</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+    with c5: 
+        st.markdown(f'''
+        <div class="card-kpi" style="{estilo_card}">
+            <div style="width: 100%;">
+                <div class="label-kpi">% Geral Perdas</div>
+                <div class="value-kpi">{perc_geral_str}</div>
+                <div class="sub-kpi">Sobre Fat.</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+    with c6: 
+        perc_finalizadas = (fechadas / total_uds * 100) if total_uds > 0 else 0
+        st.markdown(f'''
+        <div class="card-kpi" style="{estilo_card}">
+            <div style="width: 100%;">
+                <div class="label-kpi">Total UDs</div>
+                <div class="value-kpi">{total_uds}</div>
+                <div class="sub-kpi">{perc_finalizadas:.1f}% Fin.</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
 
     with c7: 
-        resumo_tipos = df_filt.groupby('tipo_clean').agg(Total=('tipo_clean', 'count'), Fim=('is_fin', 'sum')).reset_index()
+        df_validos = df_filt[df_filt['tipo_clean'].str.strip() != '']
+        resumo_tipos = df_validos.groupby('tipo_clean').agg(
+            Total=('tipo_clean', 'count'),
+            Fim=('is_fin', 'sum')
+        ).reset_index()
         resumo_tipos['Pen'] = resumo_tipos['Total'] - resumo_tipos['Fim']
-        linhas_html = "".join([f"<tr><td style='text-align:left; color:#8b949e; padding:2px;'>{r['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center;'>{r['Total']}</td><td style='color:#3fb950; text-align:center;'>{r['Fim']}</td><td style='color:#ff4b4b; text-align:center;'>{r['Pen']}</td></tr>" for _, r in resumo_tipos.iterrows()])
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div class="label-kpi" style="margin-bottom:8px;">Status / Tipo</div><table style="width:100%; font-size:10.5px; border-collapse: collapse;"><thead><tr style="color:#8b949e; border-bottom:1px solid #30363d;"><th style="text-align:left;">Tipo</th><th>Tot</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table></div>', unsafe_allow_html=True)
 
-    # --- GRÁFICOS DO MEIO CORRIGIDOS ---
+        linhas_html = ""
+        for _, row in resumo_tipos.iterrows():
+            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:2px; white-space: nowrap;'>{row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center; padding:2px;'>{row['Total']}</td><td style='color:#3fb950; text-align:center; padding:2px;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center; padding:2px;'>{row['Pen']}</td></tr>"
+
+        tabela_html = f"<table style='width:100%; table-layout: fixed; font-size:10.5px; margin-top:0px; border-top:1px solid #30363d; padding-top:4px; border-collapse: collapse;'><thead><tr style='color:#8b949e; text-transform:uppercase; border-bottom:1px solid #30363d;'><th style='text-align:left; padding-bottom:4px; padding-left:2px;'>Tipo</th><th style='text-align:center; padding-bottom:4px; white-space: nowrap;'>Tot</th><th style='text-align:center; padding-bottom:4px; white-space: nowrap;'>Fim</th><th style='text-align:center; padding-bottom:4px; padding-right:2px; white-space: nowrap;'>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table>"
+        
+        html_final = f"""<div class="card-kpi" style="{estilo_card}">
+            <div style="width: 100%;">
+                <div class="label-kpi" style="margin-bottom:8px;">Status / Tipo</div>
+                {tabela_html}
+            </div>
+        </div>"""
+
+        st.markdown(html_final, unsafe_allow_html=True)
+
+    # --- GRÁFICOS DO MEIO ---
     st.markdown("<br>", unsafe_allow_html=True)
     g1, g2 = st.columns([1, 1.1])
     
-    # Cores fixas para todos os tipos, incluindo o CROSS
-    cores_map = {'CD':'#3a7bd5', 'LV':'#7000ff', 'DQS':'#00f2ff', 'CROSS':'#ff8c00', 'OUTROS':'#8b949e'}
-
     with g1:
         st.subheader("📊 Resultado Consolidado")
-        df_plot = df_filt.groupby('tipo_clean')['v_1c'].sum().reset_index()
-        fig_b = px.bar(df_plot, x='tipo_clean', y=df_plot['v_1c'].abs(), text='v_1c', color='tipo_clean', color_discrete_map=cores_map)
+        df_proc = df_filt.copy()
+        
+        df_proc['res_total'] = df_proc['v_1c'] 
+        
+        df_plot = df_proc.groupby('tipo_clean')['res_total'].sum().reset_index()
+        fig_b = px.bar(df_plot, x='tipo_clean', y=df_plot['res_total'].abs(), text='res_total', color='tipo_clean', 
+                       # CROSS com a cor Laranja
+                       color_discrete_map={'CD':'#3a7bd5','LV':'#7000ff','DQS':'#00f2ff', 'CROSS':'#ff8c00'})
         fig_b.update_traces(texttemplate='R$ %{text:,.0f}', textposition='outside')
         fig_b.update_layout(template="plotly_dark", height=380, showlegend=False, yaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig_b, use_container_width=True)
@@ -162,21 +282,49 @@ try:
         st.subheader("🏢 Status de Saúde (Apenas 1º Ciclo)")
         df_tree = df_filt[df_filt['v_1c'] != 0].copy()
         df_tree['cd_lbl'] = df_tree['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-        fig_t = px.treemap(df_tree, path=['tipo_clean', 'cd_lbl'], values=df_tree['v_1c'].abs(), color='tipo_clean', color_discrete_map=cores_map)
+        fig_t = px.treemap(df_tree, path=['tipo_clean', 'cd_lbl'], values=df_tree['v_1c'].abs(), color='tipo_clean', 
+                           # CROSS no Treemap
+                           color_discrete_map={'CD':'#0040ff','LV':'#aa00ff','DQS':'#00d2ff', 'CROSS':'#ff8c00'})
         fig_t.update_traces(textinfo="label+value", texttemplate="<b>%{label}</b><br>R$ %{value:,.0f}")
         fig_t.update_layout(template="plotly_dark", height=380, margin=dict(t=20, b=10, l=0, r=0))
         st.plotly_chart(fig_t, use_container_width=True)
 
-    # --- BASE ---
+    # --- BASE (TABELA + PIZZA) ---
     st.markdown("<br>", unsafe_allow_html=True)
-    st.subheader("📋 Detalhamento")
-    df_tab = df_filt.copy()
-    df_tab['cd_t'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
-    st.dataframe(
-        df_tab[['semestre', 'tipo_clean', 'divisional', 'cd_t', 'local', 'v_1c', 'v_falta_real', 'v_transp', 'v_sac', 'is_fin']].style.apply(lambda r: ['background-color: #451a1a' if r['v_1c'] < 0 else 'background-color: #1a4523']*len(r), axis=1),
-        column_config={"v_1c": st.column_config.NumberColumn("$RESULTADO", format="R$ %.2f"), "v_falta_real": "FALTA VOL.", "is_fin": "FINALIZADA"},
-        use_container_width=True, hide_index=True
-    )
+    b1, b2 = st.columns([3, 1.2])
+    with b1:
+        st.subheader("📋 Detalhamento")
+        df_tab = df_filt.copy()
+        df_tab['%'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
+        df_tab['cd_t'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
+        
+        df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd_t', 'local', 'v_1c', '%', 'v_falta_real', 'v_transp', 'v_sac', 'is_fin']]
+        
+        st.dataframe(
+            df_ex.style.apply(lambda r: ['background-color: #451a1a' if r['v_1c'] < 0 else 'background-color: #1a4523']*len(r), axis=1),
+            column_config={
+                "semestre": "SEMESTRE",
+                "tipo_clean": "TIPO",
+                "divisional": "GERENTE",
+                "cd_t": "UNIDADES",
+                "local": "LOCAL",
+                "v_1c": st.column_config.NumberColumn("$RESULTADO", format="R$ %.2f"), 
+                "%": st.column_config.NumberColumn("%PERDAS", format="%.3f%%"), 
+                "v_falta_real": st.column_config.NumberColumn("FALTA VOL.", format="R$ %.0f"),
+                "v_transp": st.column_config.NumberColumn("TRANSPORTE", format="R$ %.0f"),
+                "v_sac": st.column_config.NumberColumn("SAC", format="R$ %.0f"),
+                "is_fin": "FINALIZADA"
+            },
+            use_container_width=True, 
+            hide_index=True, 
+            height="content"
+        )
+    with b2:
+        st.subheader("📍 Perda / Gerente")
+        df_pi = df_filt[df_filt['divisional'] != "Indefinido"]
+        fig_pi = px.pie(df_pi, values=df_pi['v_1c'].abs(), names='divisional', hole=0.7, color_discrete_sequence=["#00d2ff", "#008cff", "#0040ff", "#3a7bd5", "#ff8c00"])
+        fig_pi.update_layout(template="plotly_dark", height=450, margin=dict(t=50, b=50, l=0, r=0), showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
+        st.plotly_chart(fig_pi, use_container_width=True)
 
 except Exception as e:
     st.error(f"⚠️ Erro crítico: {e}")
