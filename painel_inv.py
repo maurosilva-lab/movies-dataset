@@ -6,10 +6,7 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Prevenção | BI Executive", page_icon="📊")
 
-# --- ESTILIZAÇÃO CSS (Big Numbers + 6 Cards) ---
-# --- ESTILIZAÇÃO CSS (Big Numbers + Cards) ---
-# --- ESTILIZAÇÃO CSS (Big Numbers + Cards) ---
-# --- ESTILIZAÇÃO CSS (Big Numbers + Cards) ---
+# --- ESTILIZAÇÃO CSS ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
@@ -17,7 +14,7 @@ st.markdown("""
     
     /* --- AQUI ESTÁ O AJUSTE FINO DO TOPO --- */
     .block-container {
-        padding-top: 2.5rem !important; /* <-- Aumentei para 2.5rem para a barra azul não ser cortada */
+        padding-top: 2.5rem !important; 
         padding-bottom: 1rem !important;
     }
     
@@ -38,8 +35,8 @@ st.markdown("""
         margin-top: -105px; 
     }
     .label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
-    .value-kpi { color: #f0f6fc; font-size: 26px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; }
-    .sub-kpi { color: #00d2ff; font-size: 12px; font-weight: 500; }
+    .value-kpi { color: #f0f6fc; font-size: 22px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; } /* Ajustado tamanho da fonte para caber */
+    .sub-kpi { color: #00d2ff; font-size: 11px; font-weight: 500; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -73,20 +70,24 @@ try:
     df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
     df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional)
     
+    # Capturando as colunas dinamicamente
     c_1c = next((c for c in df_raw.columns if '1__ciclo' in c), None)
     c_fat = next((c for c in df_raw.columns if 'faturamento' in c), None)
     c_fal = next((c for c in df_raw.columns if 'falta_vol' in c), None)
+    c_trans = next((c for c in df_raw.columns if 'transporte' in c), None)
+    c_sac = next((c for c in df_raw.columns if 'sac' in c), None)
 
     df_raw['v_1c'] = df_raw[c_1c].apply(limpar_valor) if c_1c else 0.0
     df_raw['v_fat'] = df_raw[c_fat].apply(limpar_valor) if c_fat else 0.0
     df_raw['v_falta'] = df_raw[c_fal].apply(limpar_valor) if c_fal else 0.0
+    df_raw['v_transp'] = df_raw[c_trans].apply(limpar_valor) if c_trans else 0.0
+    df_raw['v_sac'] = df_raw[c_sac].apply(limpar_valor) if c_sac else 0.0
     df_raw['is_fin'] = df_raw['v_1c'] != 0
 
     with st.sidebar:
         st.header("⚙️ Gerenciamento")
         if st.button("🔄 Atualizar Dados"): st.cache_data.clear(); st.rerun()
         
-        # Filtros adicionados: Semestre, Tipo e Gerente
         s_sel = st.multiselect("Filtrar Semestre", options=sorted(df_raw['semestre'].dropna().unique())) if 'semestre' in df_raw.columns else []
         t_sel = st.multiselect("Filtrar por Tipo", options=sorted(df_raw['tipo_clean'].unique()))
         d_sel = st.multiselect("Filtrar Gerente", options=sorted([x for x in df_raw['divisional'].unique() if x != "Indefinido"]))
@@ -96,16 +97,27 @@ try:
     if t_sel: df_filt = df_filt[df_filt['tipo_clean'].isin(t_sel)]
     if d_sel: df_filt = df_filt[df_filt['divisional'].isin(d_sel)]
 
+    # REGRA DE NEGÓCIO: Falta Volume só contabiliza se for processo CD
+    df_filt['v_falta_real'] = df_filt.apply(lambda x: x['v_falta'] if x['tipo_clean'] == 'CD' else 0.0, axis=1)
+
     # --- UI PRINCIPAL ---
     st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO INV PREVENÇAO DE PERDAS 2026</p></div>', unsafe_allow_html=True)
 
-    # CÁLCULOS
+    # CÁLCULOS TOTAIS
     p1c = df_filt['v_1c'].sum()
-    vfal = df_filt['v_falta'].sum()
+    vfal = df_filt['v_falta_real'].sum()
+    vtransp = df_filt['v_transp'].sum()
+    vsac = df_filt['v_sac'].sum()
     vfat_total = df_filt['v_fat'].sum()
-    perda_total = p1c + vfal
     
+    # Mantendo a função base mas agregando os novos custos lidos
+    perda_total = p1c + vfal + vtransp + vsac
+    
+    # Porcentagens semelhantes ao card Falta Volume
     perc_falta = (vfal / perda_total * 100) if perda_total != 0 else 0
+    perc_transp = (vtransp / perda_total * 100) if perda_total != 0 else 0
+    perc_sac = (vsac / perda_total * 100) if perda_total != 0 else 0
+    
     perc_geral_perdas = (perda_total / vfat_total * 100) if vfat_total != 0 else 0
     perc_geral_str = f"{perc_geral_perdas:.3f}".replace('.', ',') + "%"
     
@@ -151,64 +163,17 @@ try:
         texto_var = "Igual a 2025"
 
 
-    # 6 CARDS KPI 
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    # --- 7 CARDS KPI ---
+    # Layout responsivo: peso maior para a tabela (último índice) caber direitinho
+    c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1, 1, 1.4])
     
-   # 4 CARDS KPI (ajustado para 4 colunas iguais, dando mais largura para a tabela)
-    c1, c2, c3, c4 = st.columns(4)
-    
-   # 4 CARDS KPI 
-    c1, c2, c3, c4 = st.columns(4)
-    
-    # Estilo unificado: altura fixa de 250px e centralização vertical do conteúdo
-    estilo_card = "height: 250px; display: flex; flex-direction: column; justify-content: center; align-items: center;"
-# 4 CARDS KPI 
-    c1, c2, c3, c4 = st.columns(4)
-    
-    # Estilo unificado: altura fixa de 250px e centralização vertical do conteúdo
-    estilo_card = "height: 250px; display: flex; flex-direction: column; justify-content: center; align-items: center;"
-
-    # 4 CARDS KPI 
-    c1, c2, c3, c4 = st.columns(4)
-    
-    # Reduzimos a altura para 200px para ficar mais compacto e tiramos os espaços excessivos
-    estilo_card = "height: 200px; display: flex; flex-direction: column; justify-content: center; align-items: center;"
-
-    # 4 CARDS KPI 
-    c1, c2, c3, c4 = st.columns(4)
-    
-    # Altura "sob medida" (160px) e padding reduzido (10px) para eliminar a "testa" grande
     estilo_card = "height: 160px; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;"
-
-   # 4 CARDS KPI 
-    c1, c2, c3, c4 = st.columns(4)
-    
-    # Trocamos "justify-content: center" por "flex-start" para alinhar os títulos no topo!
-    estilo_card = "height: 175px; padding: 15px 10px; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; box-sizing: border-box;"
-
-    # 4 CARDS KPI 
-    c1, c2, c3, c4 = st.columns(4)
-    
-    # Altura corrigida para 195px para caber a tabela inteira dentro da borda
-    estilo_card = "height: 195px; padding: 15px 10px; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; box-sizing: border-box;"
-
-   # 5 CARDS KPI (Separando a tabela em um card próprio)
-    c1, c2, c3, c4, c5 = st.columns(5)
-    
-    # Altura elegante de 150px e conteúdo perfeitamente centralizado no meio!
-    estilo_card = "height: 150px; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;"
-
-   # --- 5 CARDS KPI ---
-    c1, c2, c3, c4, c5 = st.columns(5)
-    
-    # Altura elegante de 150px e conteúdo perfeitamente centralizado no meio!
-    estilo_card = "height: 150px; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;"
 
     with c1: 
         st.markdown(f'''
         <div class="card-kpi" style="{estilo_card}">
             <div style="width: 100%;">
-                <div class="label-kpi">Perda Consolidada</div>
+                <div class="label-kpi">Perda Consol.</div>
                 <div class="value-kpi">R$ {perda_total:,.0f}</div>
                 <div class="sub-kpi">{texto_var}</div>
             </div>
@@ -225,31 +190,53 @@ try:
             </div>
         </div>
         ''', unsafe_allow_html=True)
-        
+
     with c3: 
         st.markdown(f'''
         <div class="card-kpi" style="{estilo_card}">
             <div style="width: 100%;">
-                <div class="label-kpi">% Geral de Perdas</div>
-                <div class="value-kpi">{perc_geral_str}</div>
-                <div class="sub-kpi">Sobre Faturamento</div>
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-    with c4: 
-        perc_finalizadas = (fechadas / total_uds * 100) if total_uds > 0 else 0
-        st.markdown(f'''
-        <div class="card-kpi" style="{estilo_card}">
-            <div style="width: 100%;">
-                <div class="label-kpi">Total Unidades</div>
-                <div class="value-kpi">{total_uds}</div>
-                <div class="sub-kpi">{perc_finalizadas:.1f}% Finalizadas</div>
+                <div class="label-kpi">Transporte</div>
+                <div class="value-kpi">R$ {vtransp:,.0f}</div>
+                <div class="sub-kpi">{abs(perc_transp):.1f}% da Perda</div>
             </div>
         </div>
         ''', unsafe_allow_html=True)
 
+    with c4: 
+        st.markdown(f'''
+        <div class="card-kpi" style="{estilo_card}">
+            <div style="width: 100%;">
+                <div class="label-kpi">SAC</div>
+                <div class="value-kpi">R$ {vsac:,.0f}</div>
+                <div class="sub-kpi">{abs(perc_sac):.1f}% da Perda</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
     with c5: 
+        st.markdown(f'''
+        <div class="card-kpi" style="{estilo_card}">
+            <div style="width: 100%;">
+                <div class="label-kpi">% Geral Perdas</div>
+                <div class="value-kpi">{perc_geral_str}</div>
+                <div class="sub-kpi">Sobre Fat.</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+    with c6: 
+        perc_finalizadas = (fechadas / total_uds * 100) if total_uds > 0 else 0
+        st.markdown(f'''
+        <div class="card-kpi" style="{estilo_card}">
+            <div style="width: 100%;">
+                <div class="label-kpi">Total UDs</div>
+                <div class="value-kpi">{total_uds}</div>
+                <div class="sub-kpi">{perc_finalizadas:.1f}% Fin.</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+
+    with c7: 
         df_validos = df_filt[df_filt['tipo_clean'].str.strip() != '']
         resumo_tipos = df_validos.groupby('tipo_clean').agg(
             Total=('tipo_clean', 'count'),
@@ -259,33 +246,29 @@ try:
 
         linhas_html = ""
         for _, row in resumo_tipos.iterrows():
-            # Adicionado white-space: nowrap; na primeira coluna para evitar quebra
             linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:2px; white-space: nowrap;'>{row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center; padding:2px;'>{row['Total']}</td><td style='color:#3fb950; text-align:center; padding:2px;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center; padding:2px;'>{row['Pen']}</td></tr>"
 
-        # Adicionado white-space: nowrap; em todos os cabeçalhos (Tot, Fim, Pen)
         tabela_html = f"<table style='width:100%; table-layout: fixed; font-size:10.5px; margin-top:0px; border-top:1px solid #30363d; padding-top:4px; border-collapse: collapse;'><thead><tr style='color:#8b949e; text-transform:uppercase; border-bottom:1px solid #30363d;'><th style='text-align:left; padding-bottom:4px; padding-left:2px;'>Tipo</th><th style='text-align:center; padding-bottom:4px; white-space: nowrap;'>Tot</th><th style='text-align:center; padding-bottom:4px; white-space: nowrap;'>Fim</th><th style='text-align:center; padding-bottom:4px; padding-right:2px; white-space: nowrap;'>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table>"
         
         html_final = f"""<div class="card-kpi" style="{estilo_card}">
             <div style="width: 100%;">
-                <div class="label-kpi" style="margin-bottom:8px;">Status por Tipo</div>
+                <div class="label-kpi" style="margin-bottom:8px;">Status / Tipo</div>
                 {tabela_html}
             </div>
         </div>"""
 
         st.markdown(html_final, unsafe_allow_html=True)
-    ##  with c6:
-       ##   pp = (pendentes/total_uds*100) if total_uds > 0 else 0
-        ##  st.markdown(f'''<div class="card-kpi" style="min-height: 180px;"><div class="label-kpi">Pendentes</div><div class="target-container" style="background:#2a1b1b;"><div class="target-fill" style="width:{pp}%;background:#ff4b4b;"></div><div class="target-line" style="left:{target_pos}%;background:#ff4b4b;"></div><div class="target-text">{pendentes}</div></div>
-        ##  <div style="display:flex;justify-content:space-between;"><span class="target-label">0</span><span class="target-label">target</span><span class="target-label">{total_uds}</span></div></div>''', unsafe_allow_html=True)
+
 
     # --- GRÁFICOS DO MEIO ---
     st.markdown("<br>", unsafe_allow_html=True)
     g1, g2 = st.columns([1, 1.1])
     
     with g1:
-        st.subheader("📊 Resultado Consolidado (1C + Falta Vol)")
+        st.subheader("📊 Resultado Consolidado")
         df_proc = df_filt.copy()
-        df_proc['res_total'] = df_proc['v_1c'] + df_proc['v_falta']
+        # Atualizado para somar a perda real consolidada (Falta volume garantida que só processa no CD)
+        df_proc['res_total'] = df_proc['v_1c'] + df_proc['v_falta_real'] + df_proc['v_transp'] + df_proc['v_sac']
         df_plot = df_proc.groupby('tipo_clean')['res_total'].sum().reset_index()
         fig_b = px.bar(df_plot, x='tipo_clean', y=df_plot['res_total'].abs(), text='res_total', color='tipo_clean', 
                        color_discrete_map={'CD':'#3a7bd5','LV':'#7000ff','DQS':'#00f2ff'})
@@ -312,10 +295,9 @@ try:
         df_tab['%'] = (df_tab['v_1c'] / df_tab['v_fat'] * 100).fillna(0)
         df_tab['cd_t'] = df_tab['cd'].astype(str).str.replace(r'\.0$', '', regex=True)
         
-        # Mantemos os nomes originais para não quebrar a lógica de cores
-        df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd_t', 'local', 'v_1c', '%', 'v_falta', 'is_fin']]
+        # Colunas extras adicionadas na visualização final
+        df_ex = df_tab[['semestre', 'tipo_clean', 'divisional', 'cd_t', 'local', 'v_1c', '%', 'v_falta_real', 'v_transp', 'v_sac', 'is_fin']]
         
-        # Aplicamos a cor baseada na coluna original 'v_1c' e usamos o column_config para traduzir os títulos
         st.dataframe(
             df_ex.style.apply(lambda r: ['background-color: #451a1a' if r['v_1c'] < 0 else 'background-color: #1a4523']*len(r), axis=1),
             column_config={
@@ -326,7 +308,9 @@ try:
                 "local": "LOCAL",
                 "v_1c": st.column_config.NumberColumn("$RESULTADO", format="R$ %.2f"), 
                 "%": st.column_config.NumberColumn("%PERDAS", format="%.3f%%"), 
-                "v_falta": st.column_config.NumberColumn("FALTA VOL.", format="%.0f"),
+                "v_falta_real": st.column_config.NumberColumn("FALTA VOL.", format="R$ %.0f"),
+                "v_transp": st.column_config.NumberColumn("TRANSPORTE", format="R$ %.0f"),
+                "v_sac": st.column_config.NumberColumn("SAC", format="R$ %.0f"),
                 "is_fin": "FINALIZADA"
             },
             use_container_width=True, 
