@@ -84,15 +84,12 @@ if df_resultados_raw is not None:
         st.markdown('<h2 style="color: #00FFC4; text-align: center;">⚙️ FILTROS GLOBAIS</h2>', unsafe_allow_html=True)
         st.markdown("---")
         
-        # Filtro Empresa (Global)
         empresas_disp = sorted(df_resultados_raw['CD_EMPRESA'].unique())
         sel_empresas = st.multiselect("Selecione as Filiais:", empresas_disp, default=empresas_disp)
         
-        # Filtro Área (Global)
         areas_disp = sorted(df_resultados_raw['DS_AREA_ARMAZ'].unique())
         sel_areas = st.multiselect("Selecione as Áreas:", areas_disp, default=areas_disp)
         
-        # Filtro Data (Apenas Histórico)
         st.markdown("---")
         st.subheader("📅 Período do Radar")
         datas_disp = df_hist_valores_raw['DATA_APENAS'].dropna().unique()
@@ -132,9 +129,21 @@ if df_resultados_raw is not None:
             fig_p = px.pie(df_res.groupby('DS_AREA_ARMAZ')['QT_ESTOQUE'].sum().reset_index(), values='QT_ESTOQUE', names='DS_AREA_ARMAZ', hole=0.6, title="Distribuição por Setor", color_discrete_sequence=px.colors.sequential.Teal)
             fig_p.update_layout(paper_bgcolor="rgba(0,0,0,0)", font_color="#8892B0", showlegend=False)
             st.plotly_chart(fig_p, use_container_width=True)
+        
         with g2:
-            fig_b = px.bar(df_res.groupby('CD_EMPRESA')['VALOR_TOTAL_ESTOQUE_ATUALIZADO'].sum().reset_index().sort_values('VALOR_TOTAL_ESTOQUE_ATUALIZADO', ascending=True).tail(5), x='VALOR_TOTAL_ESTOQUE_ATUALIZADO', y='CD_EMPRESA', orientation='h', title="Top 5 Filiais Críticas", color='VALOR_TOTAL_ESTOQUE_ATUALIZADO', color_continuous_scale="GnBu")
-            fig_b.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#8892B0", coloraxis_showscale=False)
+            # CORREÇÃO 1: Forçando o Eixo Y a ser Categórico criando uma nova coluna com a string 'Filial'
+            df_b = df_res.groupby('CD_EMPRESA')['VALOR_TOTAL_ESTOQUE_ATUALIZADO'].sum().reset_index().sort_values('VALOR_TOTAL_ESTOQUE_ATUALIZADO', ascending=True).tail(5)
+            df_b['CD_EMPRESA_LBL'] = "Filial " + df_b['CD_EMPRESA']
+            
+            fig_b = px.bar(df_b, x='VALOR_TOTAL_ESTOQUE_ATUALIZADO', y='CD_EMPRESA_LBL', orientation='h', title="Top 5 Filiais Críticas", color='VALOR_TOTAL_ESTOQUE_ATUALIZADO', color_continuous_scale="GnBu", text_auto='.2s')
+            fig_b.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", 
+                plot_bgcolor="rgba(0,0,0,0)", 
+                font_color="#8892B0", 
+                coloraxis_showscale=False,
+                yaxis_title="", # Esconde o nome do eixo para ficar limpo
+                xaxis_title=""
+            )
             st.plotly_chart(fig_b, use_container_width=True)
 
         st.write("---")
@@ -149,15 +158,11 @@ if df_resultados_raw is not None:
         # GRÁFICO DE ONDAS (STREAMPGRAPH / SPLINE)
         st.subheader("📈 Radar Temporal: Evolução de Fluxo")
         if not df_val.empty:
-            # Agrupamento para criar as camadas (por Área ou Empresa)
             df_wave = df_val.groupby(['DATA_HORA', 'DS_AREA_ARMAZ'])['VALOR_TOTAL_ESTOQUE'].sum().reset_index()
             
-            #px.area com line_shape='spline' cria o efeito de curvas suaves
-            fig_wave = px.area(df_wave, x='DATA_HORA', y='VALOR_TOTAL_ESTOQUE', color='DS_AREA_ARMAZ', line_group='DS_AREA_ARMAZ', line_shape='spline', render_mode='svg')
+            # CORREÇÃO 2: Removido line_shape='spline' de dentro do px.area
+            fig_wave = px.area(df_wave, x='DATA_HORA', y='VALOR_TOTAL_ESTOQUE', color='DS_AREA_ARMAZ', color_discrete_sequence=['#00FFC4', '#FFB443', '#FF4B4B', '#9D50BB', '#00B4D8'])
             
-            # Estilização das cores para combinar com a imagem (Verde -> Laranja -> Roxo)
-            # Usando uma paleta que simula o brilho neon
-            custom_colors = ['#00FFC4', '#FFB443', '#FF4B4B', '#9D50BB', '#00B4D8']
             fig_wave.update_layout(
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
@@ -167,11 +172,39 @@ if df_resultados_raw is not None:
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 margin=dict(l=0, r=0, t=50, b=0)
             )
-            fig_wave.update_traces(line=dict(width=2), opacity=0.7)
+            # CORREÇÃO 2 (PARTE B): Adicionado o line_shape='spline' via update_traces
+            fig_wave.update_traces(line_shape='spline', line=dict(width=2), opacity=0.7)
+            
             st.plotly_chart(fig_wave, use_container_width=True)
         else:
             st.info("Aguardando telemetria de dados históricos...")
 
     with tab2:
+        def limpar_dados_para_excel(df):
+            df_clean = df.copy()
+            palavras_chave = ['ID', 'CD_', 'EAN', 'SKU', 'ITEM', 'PEDIDO', 'LOTE', 'BLOCO', 'APTO', 'SALA', 'EMPRESA', 'DIGIT']
+            for col in df_clean.columns:
+                if any(palavra in col.upper() for palavra in palavras_chave):
+                    df_clean[col] = df_clean[col].astype(str).str.replace(r'\.0$', '', regex=True).replace('nan', '')
+            return df_clean
+
+        def converter_para_excel(df):
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Base Consolidada')
+            return output.getvalue()
+
         st.button("🔄 LIMPAR CACHE E RECARREGAR", on_click=lambda: st.cache_data.clear())
         st.dataframe(df_res, use_container_width=True)
+        
+        st.write("---")
+        
+        df_tratado = limpar_dados_para_excel(df_res) # Alterado para baixar apenas o filtrado (df_res) em vez do raw
+        arquivo_excel = converter_para_excel(df_tratado)
+        
+        st.download_button(
+            label="📥 INICIAR DOWNLOAD DA BASE TRATADA (.XLSX)",
+            data=arquivo_excel,
+            file_name="estoque_comando_tratado.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
