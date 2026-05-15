@@ -184,16 +184,15 @@ if df_resultados is not None and not df_resultados.empty:
         st.subheader("📋 Acumulado de Estoque por Empresa e Área (Posição Atual)")
         
         if all(col in df_resultados.columns for col in ['CD_EMPRESA', 'DS_AREA_ARMAZ', 'VALOR_TOTAL_ESTOQUE_ATUALIZADO']):
-            # Agrupando os dados e renomeando
             df_tabela_acumulada = df_resultados.groupby(['CD_EMPRESA', 'DS_AREA_ARMAZ'])['VALOR_TOTAL_ESTOQUE_ATUALIZADO'].sum().reset_index()
             df_tabela_acumulada.rename(columns={'VALOR_TOTAL_ESTOQUE_ATUALIZADO': 'VALOR TOTAL ESTOQUE'}, inplace=True)
             df_tabela_acumulada = df_tabela_acumulada.sort_values(by='VALOR TOTAL ESTOQUE', ascending=False)
             
-            # Formatando a tabela com um gradiente visual para facilitar a análise
+            # CORREÇÃO AQUI: Trocado de 'Teal' para 'GnBu'
             styler_tabela = (
                 df_tabela_acumulada.style
                 .format({'VALOR TOTAL ESTOQUE': 'R$ {:,.2f}'.format})
-                .background_gradient(subset=['VALOR TOTAL ESTOQUE'], cmap='Teal')
+                .background_gradient(subset=['VALOR TOTAL ESTOQUE'], cmap='GnBu')
             )
             
             st.dataframe(styler_tabela, use_container_width=True, hide_index=True)
@@ -237,7 +236,6 @@ if df_resultados is not None and not df_resultados.empty:
             if filtro_area and 'DS_AREA_ARMAZ' in df_plot.columns:
                 df_plot = df_plot[df_plot['DS_AREA_ARMAZ'].astype(str).isin(filtro_area)]
                 
-            # Tratamento caso o usuário selecione apenas uma data ou um range
             if isinstance(filtro_data, tuple) and len(filtro_data) == 2:
                 df_plot = df_plot[(df_plot['DATA_APENAS'] >= filtro_data[0]) & (df_plot['DATA_APENAS'] <= filtro_data[1])]
             elif isinstance(filtro_data, tuple) and len(filtro_data) == 1:
@@ -245,10 +243,8 @@ if df_resultados is not None and not df_resultados.empty:
             elif filtro_data:
                 df_plot = df_plot[df_plot['DATA_APENAS'] == filtro_data]
 
-            # Agrupar por data/hora 
             df_trend = df_plot.groupby('DATA_HORA')['VALOR_TOTAL_ESTOQUE'].sum().reset_index().sort_values('DATA_HORA')
             
-            # Gráfico de Área Cyberpunk
             if not df_trend.empty:
                 fig_evol = px.area(df_trend, x='DATA_HORA', y='VALOR_TOTAL_ESTOQUE', markers=True)
                 fig_evol.update_traces(
@@ -276,7 +272,6 @@ if df_resultados is not None and not df_resultados.empty:
     with tab2:
         st.markdown('### 📡 Status da Transmissão')
         
-        # Exibe o último registro da aba histórico
         if df_historico is not None and not df_historico.empty:
             ultimo_registro = df_historico.iloc[-1]
             data_obs = ultimo_registro['DATA_HORA_ATUALIZACAO']
@@ -287,7 +282,6 @@ if df_resultados is not None and not df_resultados.empty:
             
         st.write("---")
         
-        # Preparação para Download
         df_tratado = limpar_dados_para_excel(df_resultados)
         arquivo_excel = converter_para_excel(df_tratado)
         
