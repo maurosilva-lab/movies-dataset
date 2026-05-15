@@ -38,10 +38,8 @@ def tratar_moeda(val):
     
     val_str = str(val).replace('R$', '').replace(' ', '').replace('\xa0', '').strip()
     
-    # Se tem ponto de milhar e vírgula decimal (ex: 3.675.201,65)
     if '.' in val_str and ',' in val_str:
         val_str = val_str.replace('.', '').replace(',', '.')
-    # Se tem só vírgula decimal (ex: 348090,23)
     elif ',' in val_str:
         val_str = val_str.replace(',', '.')
         
@@ -57,12 +55,10 @@ def carregar_dados():
     url_hist_valores = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Historico_Valores"
     
     try:
-        # Lê bruto, sem forçar decimais, para o nosso tratador fazer o trabalho limpo
         df_res = pd.read_csv(url_resultados)
         df_hist = pd.read_csv(url_historico)
         df_val = pd.read_csv(url_hist_valores)
         
-        # Strip em nomes de colunas por segurança
         df_res.columns = df_res.columns.str.strip()
         df_hist.columns = df_hist.columns.str.strip()
         df_val.columns = df_val.columns.str.strip()
@@ -73,13 +69,14 @@ def carregar_dados():
             if col in df_res.columns:
                 df_res[col] = df_res[col].apply(tratar_moeda)
                 
-        # Tratamento: Aba Historico_Valores (Nova)
+        # Tratamento: Aba Historico_Valores
         if 'VALOR_TOTAL_ESTOQUE' in df_val.columns:
             df_val['VALOR_TOTAL_ESTOQUE'] = df_val['VALOR_TOTAL_ESTOQUE'].apply(tratar_moeda)
             
         if 'DATA_HORA' in df_val.columns:
-            # dayfirst=True garante que o Pandas entenda dia/mês/ano corretamente
             df_val['DATA_HORA'] = pd.to_datetime(df_val['DATA_HORA'], dayfirst=True, errors='coerce')
+            # Criando coluna apenas com a Data para o filtro
+            df_val['DATA_APENAS'] = df_val['DATA_HORA'].dt.date
             
         # Forçar a empresa a ser tratada como Texto, removendo ".0" do final
         if 'CD_EMPRESA' in df_val.columns:
@@ -139,7 +136,6 @@ if df_resultados is not None and not df_resultados.empty:
         qtd_cds = df_resultados['CD_EMPRESA'].nunique() if 'CD_EMPRESA' in df_resultados.columns else 0
         qtd_areas = df_resultados['DS_AREA_ARMAZ'].nunique() if 'DS_AREA_ARMAZ' in df_resultados.columns else 0
         
-        # Formatando valores para o padrão brasileiro
         valor_formatado = f"R$ {total_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         pecas_formatado = f"{int(total_pecas):,}".replace(",", ".")
         
@@ -184,43 +180,96 @@ if df_resultados is not None and not df_resultados.empty:
 
         st.write("---")
 
-        # ---- LINHA 3: GRÁFICO DE EVOLUÇÃO NEON ----
+        # ---- NOVA LINHA: TABELA ACUMULADA (Resultados) ----
+        st.subheader("📋 Acumulado de Estoque por Empresa e Área (Posição Atual)")
+        
+        if all(col in df_resultados.columns for col in ['CD_EMPRESA', 'DS_AREA_ARMAZ', 'VALOR_TOTAL_ESTOQUE_ATUALIZADO']):
+            # Agrupando os dados e renomeando
+            df_tabela_acumulada = df_resultados.groupby(['CD_EMPRESA', 'DS_AREA_ARMAZ'])['VALOR_TOTAL_ESTOQUE_ATUALIZADO'].sum().reset_index()
+            df_tabela_acumulada.rename(columns={'VALOR_TOTAL_ESTOQUE_ATUALIZADO': 'VALOR TOTAL ESTOQUE'}, inplace=True)
+            df_tabela_acumulada = df_tabela_acumulada.sort_values(by='VALOR TOTAL ESTOQUE', ascending=False)
+            
+            # Formatando a tabela com um gradiente visual para facilitar a análise
+            styler_tabela = (
+                df_tabela_acumulada.style
+                .format({'VALOR TOTAL ESTOQUE': 'R$ {:,.2f}'.format})
+                .background_gradient(subset=['VALOR TOTAL ESTOQUE'], cmap='Teal')
+            )
+            
+            st.dataframe(styler_tabela, use_container_width=True, hide_index=True)
+        else:
+            st.warning("Colunas 'CD_EMPRESA', 'DS_AREA_ARMAZ' ou 'VALOR_TOTAL_ESTOQUE_ATUALIZADO' não encontradas no BigQuery Results.")
+
+        st.write("---")
+
+        # ---- LINHA 3: GRÁFICO DE EVOLUÇÃO NEON (Com Filtros) ----
         st.subheader("📈 Radar Temporal: Evolução do Capital Retido")
         st.caption("*(Nota: Uma linha evolutiva surgirá assim que o robô realizar as próximas coletas de histórico)*")
         
         if df_hist_valores is not None and not df_hist_valores.empty:
             
-            # Filtro Interativo
-            filiais_disponiveis = ["Todas as Filiais"] + sorted(df_hist_valores['CD_EMPRESA'].dropna().unique().tolist())
-            filial_selecionada = st.selectbox("Selecione a base de análise:", filiais_disponiveis)
+            # --- FILTROS INTERATIVOS DO HISTÓRICO ---
+            col_f1, col_f2, col_f3 = st.columns(3)
             
-            # Filtragem do DataFrame
+            with col_f1:
+                filiais_disp = sorted([str(x) for x in df_hist_valores['CD_EMPRESA'].dropna().unique() if str(x).strip() != 'nan'])
+                filtro_empresa = st.multiselect("Filtrar Empresa (CD_EMPRESA):", filiais_disp, default=filiais_disp)
+                
+            with col_f2:
+                if 'DS_AREA_ARMAZ' in df_hist_valores.columns:
+                    areas_disp = sorted([str(x) for x in df_hist_valores['DS_AREA_ARMAZ'].dropna().unique() if str(x).strip() != 'nan'])
+                    filtro_area = st.multiselect("Filtrar Área (DS_AREA_ARMAZ):", areas_disp, default=areas_disp)
+                else:
+                    filtro_area = []
+                    
+            with col_f3:
+                datas_disp = df_hist_valores['DATA_APENAS'].dropna().unique()
+                min_date = min(datas_disp) if len(datas_disp) > 0 else pd.to_datetime('today').date()
+                max_date = max(datas_disp) if len(datas_disp) > 0 else pd.to_datetime('today').date()
+                filtro_data = st.date_input("Filtrar Data (Início / Fim):", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+
+            # --- APLICAÇÃO DOS FILTROS ---
             df_plot = df_hist_valores.copy()
-            if filial_selecionada != "Todas as Filiais":
-                df_plot = df_plot[df_plot['CD_EMPRESA'] == filial_selecionada]
             
-            # Agrupar por data (caso existam múltiplos setores na mesma hora/data)
+            if filtro_empresa:
+                df_plot = df_plot[df_plot['CD_EMPRESA'].isin(filtro_empresa)]
+            
+            if filtro_area and 'DS_AREA_ARMAZ' in df_plot.columns:
+                df_plot = df_plot[df_plot['DS_AREA_ARMAZ'].astype(str).isin(filtro_area)]
+                
+            # Tratamento caso o usuário selecione apenas uma data ou um range
+            if isinstance(filtro_data, tuple) and len(filtro_data) == 2:
+                df_plot = df_plot[(df_plot['DATA_APENAS'] >= filtro_data[0]) & (df_plot['DATA_APENAS'] <= filtro_data[1])]
+            elif isinstance(filtro_data, tuple) and len(filtro_data) == 1:
+                df_plot = df_plot[df_plot['DATA_APENAS'] == filtro_data[0]]
+            elif filtro_data:
+                df_plot = df_plot[df_plot['DATA_APENAS'] == filtro_data]
+
+            # Agrupar por data/hora 
             df_trend = df_plot.groupby('DATA_HORA')['VALOR_TOTAL_ESTOQUE'].sum().reset_index().sort_values('DATA_HORA')
             
             # Gráfico de Área Cyberpunk
-            fig_evol = px.area(df_trend, x='DATA_HORA', y='VALOR_TOTAL_ESTOQUE', markers=True)
-            fig_evol.update_traces(
-                line_color='#00FFC4', 
-                line_width=3,
-                fillcolor='rgba(0, 255, 196, 0.15)',
-                marker=dict(size=8, color='#00B4D8', symbol='diamond')
-            )
-            fig_evol.update_layout(
-                plot_bgcolor="rgba(0,0,0,0)", 
-                paper_bgcolor="rgba(0,0,0,0)", 
-                font_color="#8892B0",
-                xaxis_title="",
-                yaxis_title="Valor Acumulado (R$)",
-                hovermode="x unified",
-                xaxis=dict(showgrid=True, gridcolor='rgba(136, 146, 176, 0.1)'),
-                yaxis=dict(showgrid=True, gridcolor='rgba(136, 146, 176, 0.1)')
-            )
-            st.plotly_chart(fig_evol, use_container_width=True)
+            if not df_trend.empty:
+                fig_evol = px.area(df_trend, x='DATA_HORA', y='VALOR_TOTAL_ESTOQUE', markers=True)
+                fig_evol.update_traces(
+                    line_color='#00FFC4', 
+                    line_width=3,
+                    fillcolor='rgba(0, 255, 196, 0.15)',
+                    marker=dict(size=8, color='#00B4D8', symbol='diamond')
+                )
+                fig_evol.update_layout(
+                    plot_bgcolor="rgba(0,0,0,0)", 
+                    paper_bgcolor="rgba(0,0,0,0)", 
+                    font_color="#8892B0",
+                    xaxis_title="",
+                    yaxis_title="Valor Acumulado (R$)",
+                    hovermode="x unified",
+                    xaxis=dict(showgrid=True, gridcolor='rgba(136, 146, 176, 0.1)'),
+                    yaxis=dict(showgrid=True, gridcolor='rgba(136, 146, 176, 0.1)')
+                )
+                st.plotly_chart(fig_evol, use_container_width=True)
+            else:
+                st.warning("Nenhum dado encontrado para os filtros selecionados no histórico.")
         else:
             st.info("Aguardando acumulação de dados no histórico para traçar a evolução...")
 
