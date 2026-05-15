@@ -155,25 +155,32 @@ if df_resultados_raw is not None:
 
         st.write("---")
 
-        # GRÁFICO DE ONDAS (STREAMPGRAPH / SPLINE)
+       # GRÁFICO DE ONDAS (STREAMPGRAPH / SPLINE)
         st.subheader("📈 Radar Temporal: Evolução de Fluxo")
         if not df_val.empty:
-            df_wave = df_val.groupby(['DATA_HORA', 'DS_AREA_ARMAZ'])['VALOR_TOTAL_ESTOQUE'].sum().reset_index()
+            # Agrupa APENAS por data/hora para ter o volume total consolidado
+            df_wave = df_val.groupby('DATA_HORA')['VALOR_TOTAL_ESTOQUE'].sum().reset_index()
             
-            # CORREÇÃO 2: Removido line_shape='spline' de dentro do px.area
-            fig_wave = px.area(df_wave, x='DATA_HORA', y='VALOR_TOTAL_ESTOQUE', color='DS_AREA_ARMAZ', color_discrete_sequence=['#00FFC4', '#FFB443', '#FF4B4B', '#9D50BB', '#00B4D8'])
+            # Cria o gráfico de área com uma cor só (Neon)
+            fig_wave = px.area(df_wave, x='DATA_HORA', y='VALOR_TOTAL_ESTOQUE')
             
             fig_wave.update_layout(
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
                 font_color="#8892B0",
                 xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)', title=""),
-                yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)', title="Acumulado (R$)"),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                margin=dict(l=0, r=0, t=50, b=0)
+                yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)', title="Acumulado Total (R$)"),
+                margin=dict(l=0, r=0, t=20, b=0),
+                showlegend=False
             )
-            # CORREÇÃO 2 (PARTE B): Adicionado o line_shape='spline' via update_traces
-            fig_wave.update_traces(line_shape='spline', line=dict(width=2), opacity=0.7)
+            
+            # Aplica o efeito spline (curvas suaves), cor neon da linha e preenchimento translúcido
+            fig_wave.update_traces(
+                line_shape='spline', 
+                line=dict(color='#00FFC4', width=3), 
+                fillcolor='rgba(0, 255, 196, 0.15)',
+                opacity=1
+            )
             
             st.plotly_chart(fig_wave, use_container_width=True)
         else:
