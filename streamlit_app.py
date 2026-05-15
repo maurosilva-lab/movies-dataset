@@ -74,7 +74,6 @@ def load_data_by_gid(gid: str, target_columns: List[str], column_indices: range)
     url = f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEET_ID}/export?format=csv&gid={gid}"
     try:
         df = pd.read_csv(url)
-        # Seleciona colunas pelo índice para evitar erro de nome
         df_selected = df.iloc[:, column_indices] 
         if len(df_selected.columns) == len(target_columns):
             df_selected.columns = target_columns
@@ -177,8 +176,12 @@ st.header("⚙️ Filtros Globais")
 c_multiselect, c_areas, c_datas = st.columns([1.5, 1.5, 2])
 
 # Filtro 1: CD_EMPRESA 
+# CORREÇÃO DO BUG TYPEERROR:
 empresas_disp = df_resumo_full["CD_EMPRESA"].unique()
-empresas_disp_sorted = sorted(empresas_disp)
+# Remove valores vazios/nulos, converte para string para garantir uniformidade e ordena
+empresas_disp_limpo = [str(x) for x in empresas_disp if pd.notna(x) and str(x).strip() != 'nan']
+empresas_disp_sorted = sorted(list(set(empresas_disp_limpo)))
+
 with c_multiselect:
     sel_empresa_area = st.multiselect(
         "CD'S (Análise de Área/KPIs)", 
@@ -187,9 +190,12 @@ with c_multiselect:
     )
 
 # Filtro 2: ÁREAS 
+# Corrigindo aqui também por garantia:
 areas_disp = df_resumo_full["DS_AREA_ARMAZ"].unique()
+areas_disp_limpo = sorted([str(x) for x in areas_disp if pd.notna(x) and str(x).strip() != 'nan'])
+
 with c_areas:
-    sel_areas_estoque = st.multiselect("Áreas (Visão Geral Estoque)", areas_disp, default=list(areas_disp))
+    sel_areas_estoque = st.multiselect("Áreas (Visão Geral Estoque)", areas_disp_limpo, default=areas_disp_limpo)
 
 # Filtro 3: INTERVALO DE DATAS 
 with c_datas:
