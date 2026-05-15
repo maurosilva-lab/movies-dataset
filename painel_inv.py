@@ -61,7 +61,6 @@ def mapear_divisional(cd):
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1iaHnigQGOH5w4xFlZXN0cXYSZlLqPuHE1Pdsgy0XSdI/export?format=csv&gid=1358149674"
     df = pd.read_csv(url).dropna(how='all')
-    # O seu limpador transforma "Total_Custo inv" em "total_custo_inv"
     df.columns = [re.sub(r'[^a-zA-Z0-9]', '_', str(c).strip().lower()) for c in df.columns]
     return df
 
@@ -70,15 +69,12 @@ try:
     df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
     df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional)
     
-    # 1. MAPEAMENTO DAS COLUNAS CONFORME SOLICITADO
-    # 'total_custo_inv' para Perda Consol.
+    # 1. MAPEAMENTO DAS COLUNAS
     c_perda_total = next((c for c in df_raw.columns if 'total_custo_inv' in c), None)
-    # 'falta_volume' para Falta Volume
-    c_falta_vol = next((c for c in df_raw.columns if 'falta_volume' in c), None)
-    # 'custo_inv_transporte' para Transporte
+    # CORREÇÃO AQUI: buscando por 'falta_vol' conforme o novo nome da coluna
+    c_falta_vol = next((c for c in df_raw.columns if 'falta_vol' in c), None)
     c_transp = next((c for c in df_raw.columns if 'custo_inv_transporte' in c), None)
     
-    # Colunas auxiliares que já existiam
     c_fat = next((c for c in df_raw.columns if 'faturamento' in c), None)
     c_sac = next((c for c in df_raw.columns if 'sac' in c), None)
     c_1c = next((c for c in df_raw.columns if '1__ciclo' in c), None)
@@ -89,7 +85,7 @@ try:
     df_raw['v_transp'] = df_raw[c_transp].apply(limpar_valor) if c_transp else 0.0
     df_raw['v_sac'] = df_raw[c_sac].apply(limpar_valor) if c_sac else 0.0
     df_raw['v_fat'] = df_raw[c_fat].apply(limpar_valor) if c_fat else 0.0
-    df_raw['v_1c'] = df_raw[c_1c].apply(limpar_valor) if c_1c else 0.0 # Usado no treemap
+    df_raw['v_1c'] = df_raw[c_1c].apply(limpar_valor) if c_1c else 0.0 
     
     df_raw['is_fin'] = df_raw['v_perda_consol'] != 0
 
@@ -109,7 +105,7 @@ try:
     st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO INV PREVENÇAO DE PERDAS 2026</p></div>', unsafe_allow_html=True)
 
     # 3. NOVOS CÁLCULOS DOS TOTAIS
-    perda_total = df_filt['v_perda_consol'].sum() # Pega direto da coluna consolidada
+    perda_total = df_filt['v_perda_consol'].sum() 
     vfal = df_filt['v_falta'].sum()
     vtransp = df_filt['v_transp'].sum()
     vsac = df_filt['v_sac'].sum()
@@ -125,7 +121,7 @@ try:
     total_uds = len(df_filt)
     fechadas = df_filt['is_fin'].sum()
 
-    # --- LÓGICA DE COMPARAÇÃO 2025 (Mantida) ---
+    # --- LÓGICA DE COMPARAÇÃO 2025 ---
     dados_2025 = pd.DataFrame([
         {'tipo': 'CD', 'semestre': '1º semestre', 'valor': 9415271},
         {'tipo': 'CD', 'semestre': '2º semestre', 'valor': 5379088},
@@ -182,7 +178,7 @@ try:
         tabela_html = f"<table style='width:100%; font-size:10.5px; border-top:1px solid #30363d; margin-top:5px;'><thead><tr style='color:#8b949e;'><th>Tipo</th><th>Tot</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table>"
         st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Status / Tipo</div>{tabela_html}</div></div>', unsafe_allow_html=True)
 
-    # --- GRÁFICOS (Ajustados para as novas variáveis) ---
+    # --- GRÁFICOS ---
     st.markdown("<br>", unsafe_allow_html=True)
     g1, g2 = st.columns([1, 1.1])
     with g1:
