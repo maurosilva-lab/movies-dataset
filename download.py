@@ -6,7 +6,8 @@ import plotly.express as px
 # ==========================================
 # 1. CONFIGURAÇÃO DA PÁGINA E DESIGN (FUTURISTA)
 # ==========================================
-st.set_page_config(page_title="Centro de Comando | Estoque", page_icon="🛸", layout="wide", initial_sidebar_state="collapsed")
+# Alterado initial_sidebar_state para "expanded" para mostrar os filtros de cara (o usuário pode esconder depois)
+st.set_page_config(page_title="Centro de Comando | Estoque", page_icon="🛸", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
@@ -23,6 +24,9 @@ st.markdown("""
         /* Botão de Download Moderno */
         .stDownloadButton>button { background: linear-gradient(90deg, #00FFC4 0%, #00B4D8 100%); color: #0B132B; border: none; padding: 15px 32px; font-size: 18px; border-radius: 8px; width: 100%; font-weight: 800; transition: 0.4s; text-transform: uppercase;}
         .stDownloadButton>button:hover { opacity: 0.8; transform: scale(1.02); color: #0B132B;}
+        
+        /* Ajuste do Sidebar */
+        [data-testid="stSidebar"] { background-color: #0B132B; border-right: 1px solid #1C2541;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -32,17 +36,13 @@ st.markdown("""
 SHEET_ID = "11-IwzWjgFVKynzDTkqpr4_Fbs4GclKhS7W0KTKms0q4" 
 
 def tratar_moeda(val):
-    """ Função blindada para limpar formatos financeiros (R$, pontos e vírgulas) """
     if pd.isna(val): return 0.0
     if isinstance(val, (int, float)): return float(val)
-    
     val_str = str(val).replace('R$', '').replace(' ', '').replace('\xa0', '').strip()
-    
     if '.' in val_str and ',' in val_str:
         val_str = val_str.replace('.', '').replace(',', '.')
     elif ',' in val_str:
         val_str = val_str.replace(',', '.')
-        
     try:
         return float(val_str)
     except:
@@ -63,22 +63,18 @@ def carregar_dados():
         df_hist.columns = df_hist.columns.str.strip()
         df_val.columns = df_val.columns.str.strip()
         
-        # Tratamento: Aba Results
         cols_financeiras = ['VALOR_TOTAL_ESTOQUE_ATUALIZADO', 'QT_ESTOQUE', 'CUSTO_MEDIO', 'CUSTO_PGTO']
         for col in cols_financeiras:
             if col in df_res.columns:
                 df_res[col] = df_res[col].apply(tratar_moeda)
                 
-        # Tratamento: Aba Historico_Valores
         if 'VALOR_TOTAL_ESTOQUE' in df_val.columns:
             df_val['VALOR_TOTAL_ESTOQUE'] = df_val['VALOR_TOTAL_ESTOQUE'].apply(tratar_moeda)
             
         if 'DATA_HORA' in df_val.columns:
             df_val['DATA_HORA'] = pd.to_datetime(df_val['DATA_HORA'], dayfirst=True, errors='coerce')
-            # Criando coluna apenas com a Data para o filtro
             df_val['DATA_APENAS'] = df_val['DATA_HORA'].dt.date
             
-        # Forçar a empresa a ser tratada como Texto, removendo ".0" do final
         if 'CD_EMPRESA' in df_val.columns:
             df_val['CD_EMPRESA'] = df_val['CD_EMPRESA'].astype(str).str.replace(r'\.0$', '', regex=True)
         if 'CD_EMPRESA' in df_res.columns:
@@ -108,7 +104,7 @@ def converter_para_excel(df):
     return output.getvalue()
 
 # ==========================================
-# 3. INTERFACE DA APLICAÇÃO (UI)
+# 3. CARREGAMENTO DOS DADOS E HEADER
 # ==========================================
 col_header, col_refresh = st.columns([0.85, 0.15])
 
@@ -124,9 +120,44 @@ with col_refresh:
 with st.spinner('Sincronizando com o BigQuery via Satélite...'):
     df_resultados, df_historico, df_hist_valores = carregar_dados()
 
+# ==========================================
+# 4. SIDEBAR (FILTROS)
+# ==========================================
+filtro_empresa = []
+filtro_area = []
+filtro_data = None
+
+if df_resultados is not None and not df_resultados.empty:
+    with st.sidebar:
+        st.markdown('<h2 style="color: #00FFC4; text-align: center;">⚙️ PAINEL DE CONTROLE</h2>', unsafe_allow_html=True)
+        st.markdown("---")
+        
+        st.subheader("📈 Filtros: Gráfico de Evolução")
+        st.caption("Aplica-se ao radar temporal do histórico.")
+        
+        if df_hist_valores is not None and not df_hist_valores.empty:
+            # Filtro Empresa
+            filiais_disp = sorted([str(x) for x in df_hist_valores['CD_EMPRESA'].dropna().unique() if str(x).strip() != 'nan'])
+            filtro_empresa = st.multiselect("Filtrar Filial:", filiais_disp, default=filiais_disp)
+            
+            # Filtro Área
+            if 'DS_AREA_ARMAZ' in df_hist_valores.columns:
+                areas_disp = sorted([str(x) for x in df_hist_valores['DS_AREA_ARMAZ'].dropna().unique() if str(x).strip() != 'nan'])
+                filtro_area = st.multiselect("Filtrar Área de Armazém:", areas_disp, default=areas_disp)
+                
+            # Filtro Data
+            datas_disp = df_hist_valores['DATA_APENAS'].dropna().unique()
+            min_date = min(datas_disp) if len(datas_disp) > 0 else pd.to_datetime('today').date()
+            max_date = max(datas_disp) if len(datas_disp) > 0 else pd.to_datetime('today').date()
+            filtro_data = st.date_input("Filtrar Período (Início / Fim):", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+        else:
+            st.warning("Sem dados históricos para filtrar.")
+
+# ==========================================
+# 5. CORPO DA APLICAÇÃO (TABS)
+# ==========================================
 if df_resultados is not None and not df_resultados.empty:
     
-    # Organização em Abas
     tab1, tab2 = st.tabs(["📊 DASHBOARD VISÃO GLOBAL", "📥 EXTRAÇÃO DE DADOS"])
     
     with tab1:
@@ -188,7 +219,6 @@ if df_resultados is not None and not df_resultados.empty:
             df_tabela_acumulada.rename(columns={'VALOR_TOTAL_ESTOQUE_ATUALIZADO': 'VALOR TOTAL ESTOQUE'}, inplace=True)
             df_tabela_acumulada = df_tabela_acumulada.sort_values(by='VALOR TOTAL ESTOQUE', ascending=False)
             
-            # CORREÇÃO AQUI: Trocado de 'Teal' para 'GnBu'
             styler_tabela = (
                 df_tabela_acumulada.style
                 .format({'VALOR TOTAL ESTOQUE': 'R$ {:,.2f}'.format})
@@ -197,37 +227,17 @@ if df_resultados is not None and not df_resultados.empty:
             
             st.dataframe(styler_tabela, use_container_width=True, hide_index=True)
         else:
-            st.warning("Colunas 'CD_EMPRESA', 'DS_AREA_ARMAZ' ou 'VALOR_TOTAL_ESTOQUE_ATUALIZADO' não encontradas no BigQuery Results.")
+            st.warning("Colunas necessárias não encontradas na aba BigQuery Results.")
 
         st.write("---")
 
-        # ---- LINHA 3: GRÁFICO DE EVOLUÇÃO NEON (Com Filtros) ----
+        # ---- LINHA 3: GRÁFICO DE EVOLUÇÃO NEON (Com Filtros da Sidebar) ----
         st.subheader("📈 Radar Temporal: Evolução do Capital Retido")
-        st.caption("*(Nota: Uma linha evolutiva surgirá assim que o robô realizar as próximas coletas de histórico)*")
+        st.caption("*(Baseado nos filtros selecionados na barra lateral)*")
         
         if df_hist_valores is not None and not df_hist_valores.empty:
             
-            # --- FILTROS INTERATIVOS DO HISTÓRICO ---
-            col_f1, col_f2, col_f3 = st.columns(3)
-            
-            with col_f1:
-                filiais_disp = sorted([str(x) for x in df_hist_valores['CD_EMPRESA'].dropna().unique() if str(x).strip() != 'nan'])
-                filtro_empresa = st.multiselect("Filtrar Empresa (CD_EMPRESA):", filiais_disp, default=filiais_disp)
-                
-            with col_f2:
-                if 'DS_AREA_ARMAZ' in df_hist_valores.columns:
-                    areas_disp = sorted([str(x) for x in df_hist_valores['DS_AREA_ARMAZ'].dropna().unique() if str(x).strip() != 'nan'])
-                    filtro_area = st.multiselect("Filtrar Área (DS_AREA_ARMAZ):", areas_disp, default=areas_disp)
-                else:
-                    filtro_area = []
-                    
-            with col_f3:
-                datas_disp = df_hist_valores['DATA_APENAS'].dropna().unique()
-                min_date = min(datas_disp) if len(datas_disp) > 0 else pd.to_datetime('today').date()
-                max_date = max(datas_disp) if len(datas_disp) > 0 else pd.to_datetime('today').date()
-                filtro_data = st.date_input("Filtrar Data (Início / Fim):", value=(min_date, max_date), min_value=min_date, max_value=max_date)
-
-            # --- APLICAÇÃO DOS FILTROS ---
+            # --- APLICAÇÃO DOS FILTROS DA SIDEBAR ---
             df_plot = df_hist_valores.copy()
             
             if filtro_empresa:
@@ -265,7 +275,7 @@ if df_resultados is not None and not df_resultados.empty:
                 )
                 st.plotly_chart(fig_evol, use_container_width=True)
             else:
-                st.warning("Nenhum dado encontrado para os filtros selecionados no histórico.")
+                st.warning("Nenhum dado encontrado para os filtros selecionados.")
         else:
             st.info("Aguardando acumulação de dados no histórico para traçar a evolução...")
 
