@@ -68,10 +68,10 @@ try:
     df_raw = load_data().copy()
     df_raw['tipo_clean'] = df_raw['tipo'].fillna('').astype(str).str.upper().str.strip()
     df_raw['divisional'] = df_raw['cd'].apply(mapear_divisional)
+    df_raw['semestre_clean'] = df_raw['semestre'].fillna('Sem Semestre').astype(str).str.strip()
     
     # 1. MAPEAMENTO DAS COLUNAS
     c_perda_total = next((c for c in df_raw.columns if 'total_custo_inv' in c), None)
-    # CORREÇÃO AQUI: buscando por 'falta_vol' conforme o novo nome da coluna
     c_falta_vol = next((c for c in df_raw.columns if 'falta_vol' in c), None)
     c_transp = next((c for c in df_raw.columns if 'custo_inv_transporte' in c), None)
     
@@ -92,12 +92,12 @@ try:
     with st.sidebar:
         st.header("⚙️ Gerenciamento")
         if st.button("🔄 Atualizar Dados"): st.cache_data.clear(); st.rerun()
-        s_sel = st.multiselect("Filtrar Semestre", options=sorted(df_raw['semestre'].dropna().unique())) if 'semestre' in df_raw.columns else []
+        s_sel = st.multiselect("Filtrar Semestre", options=sorted(df_raw['semestre_clean'].unique()))
         t_sel = st.multiselect("Filtrar por Tipo", options=sorted(df_raw['tipo_clean'].unique()))
         d_sel = st.multiselect("Filtrar Gerente", options=sorted([x for x in df_raw['divisional'].unique() if x != "Indefinido"]))
 
     df_filt = df_raw.copy()
-    if s_sel: df_filt = df_filt[df_filt['semestre'].isin(s_sel)]
+    if s_sel: df_filt = df_filt[df_filt['semestre_clean'].isin(s_sel)]
     if t_sel: df_filt = df_filt[df_filt['tipo_clean'].isin(t_sel)]
     if d_sel: df_filt = df_filt[df_filt['divisional'].isin(d_sel)]
 
@@ -118,8 +118,12 @@ try:
     perc_geral_perdas = (perda_total / vfat_total * 100) if vfat_total != 0 else 0
     perc_geral_str = f"{perc_geral_perdas:.3f}".replace('.', ',') + "%"
     
-    total_uds = len(df_filt)
-    fechadas = df_filt['is_fin'].sum()
+    # 💥 CORREÇÃO DE DUPLICAÇÃO POR UNIDADE / FILIAL 💥
+    # Conta apenas unidades/filiais únicas (CD/LV únicos)
+    total_uds = df_filt['cd'].nunique()
+    
+    # Filiais que possuem ao menos 1 inventário finalizado
+    fechadas = df_filt[df_filt['is_fin']]['cd'].nunique()
 
     # --- LÓGICA DE COMPARAÇÃO 2025 ---
     dados_2025 = pd.DataFrame([
@@ -133,8 +137,8 @@ try:
         {'tipo': 'LV', 'semestre': '2º semestre', 'valor': 2509390}
     ])
     tipos_presentes = df_filt['tipo_clean'].unique()
-    if 'semestre' in df_filt.columns:
-        semestres_presentes = df_filt['semestre'].astype(str).str.lower().str.strip().unique()
+    if 'semestre_clean' in df_filt.columns:
+        semestres_presentes = df_filt['semestre_clean'].str.lower().str.strip().unique()
         dados_2025['semestre_clean'] = dados_2025['semestre'].str.lower().str.strip()
         df_2025_filt = dados_2025[(dados_2025['tipo'].isin(tipos_presentes)) & (dados_2025['semestre_clean'].isin(semestres_presentes))]
     else:
@@ -152,7 +156,7 @@ try:
         texto_var = "Igual a 2025"
 
     # --- EXIBIÇÃO DOS CARDS ---
-    c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1, 1, 1.4])
+    c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1, 1, 1.5])
     estilo_card = "height: 160px; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;"
 
     with c1: 
@@ -167,16 +171,28 @@ try:
         st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">% Geral Perdas</div><div class="value-kpi">{perc_geral_str}</div><div class="sub-kpi">Sobre Fat.</div></div></div>', unsafe_allow_html=True)
     with c6: 
         perc_fin = (fechadas / total_uds * 100) if total_uds > 0 else 0
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Total UDs</div><div class="value-kpi">{total_uds}</div><div class="sub-kpi">{perc_fin:.1f}% Fin.</div></div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Total Filiais Únicas</div><div class="value-kpi">{total_uds}</div><div class="sub-kpi">{perc_fin:.1f}% Fin.</div></div></div>', unsafe_allow_html=True)
+    
     with c7: 
-        df_validos = df_filt[df_filt['tipo_clean'].str.strip() != '']
-        resumo_tipos = df_validos.groupby('tipo_clean').agg(Total=('tipo_clean', 'count'), Fim=('is_fin', 'sum')).reset_index()
+        # 💥 MONTAGEM DA TABELA DE STATUS COM SEMESTRE E SEM DUPLICAR UNIDADES 💥
+        df_validos = df_filt[df_filt['tipo_clean'].str.strip() != ''].copy()
+        
+        # Agrupa por Semestre + Tipo de forma única
+        resumo_tipos = df_validos.groupby(['semestre_clean', 'tipo_clean']).agg(
+            Total=('cd', 'nunique'),
+            Fim=('cd', lambda x: df_validos.loc[x.index][df_validos.loc[x.index]['is_fin']]['cd'].nunique())
+        ).reset_index()
+        
         resumo_tipos['Pen'] = resumo_tipos['Total'] - resumo_tipos['Fim']
+        
         linhas_html = ""
         for _, row in resumo_tipos.iterrows():
-            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:2px;'>{row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center;'>{row['Total']}</td><td style='color:#3fb950; text-align:center;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center;'>{row['Pen']}</td></tr>"
-        tabela_html = f"<table style='width:100%; font-size:10.5px; border-top:1px solid #30363d; margin-top:5px;'><thead><tr style='color:#8b949e;'><th>Tipo</th><th>Tot</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table>"
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Status / Tipo</div>{tabela_html}</div></div>', unsafe_allow_html=True)
+            sem_label = row['semestre_clean'].replace('semestre', 'Sem.').replace('º', 'º')
+            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:2px;'>{sem_label} | {row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center;'>{row['Total']}</td><td style='color:#3fb950; text-align:center;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center;'>{row['Pen']}</td></tr>"
+            
+        tabela_html = f"<div style='max-height: 105px; overflow-y: auto;'><table style='width:100%; font-size:10px; border-top:1px solid #30363d; margin-top:2px;'><thead><tr style='color:#8b949e;'><th style='text-align:left;'>Sem | Tipo</th><th>Tot</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table></div>"
+        
+        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Status / Semestre</div>{tabela_html}</div></div>', unsafe_allow_html=True)
 
     # --- GRÁFICOS ---
     st.markdown("<br>", unsafe_allow_html=True)
