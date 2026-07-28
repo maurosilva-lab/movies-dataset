@@ -228,9 +228,13 @@ try:
         # Tabela Executiva de Status ao Lado dos KPIs
         df_validos = df_filt[df_filt['tipo_clean'].str.strip() != ''].copy()
         
+        # Agrupamento correto:
+        # Tot = Total de filiais unicas
+        # Inv = Quantidade de inventarios FECHADOS/REALIZADOS (is_fin == True)
+        # Fim = Filiais unicas com inventario finalizado
         resumo_tipos = df_validos.groupby(['semestre_clean', 'tipo_clean']).agg(
             Tot=('cd', 'nunique'),
-            Inv=('cd', 'count'),
+            Inv=('cd', lambda x: df_validos.loc[x.index][df_validos.loc[x.index]['is_fin']]['cd'].count()),
             Fim=('cd', lambda x: df_validos.loc[x.index][df_validos.loc[x.index]['is_fin']]['cd'].nunique())
         ).reset_index()
         
@@ -244,7 +248,6 @@ try:
         tabela_status = f"""<div class="status-container"><div class="status-title"><span>📋 Status dos Inventários</span><span style="font-size:10px; color:#8b949e; font-weight:normal;">Visão por Semestre</span></div><div style="max-height: 220px; overflow-y: auto;"><table class="exec-table"><thead><tr><th>Semestre / Tipo</th><th>Filiais</th><th>Qtd Inv</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table></div></div>"""
         
         st.markdown(tabela_status, unsafe_allow_html=True)
-
     # --- GRÁFICOS ---
     st.markdown("<br>", unsafe_allow_html=True)
     g1, g2 = st.columns([1, 1.1])
