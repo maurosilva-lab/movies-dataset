@@ -6,36 +6,84 @@ import re
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(layout="wide", page_title="Prevenção | BI Executive", page_icon="📊")
 
-## --- ESTILIZAÇÃO CSS ---
+## --- ESTILIZAÇÃO CSS EXECUTIVA ---
 st.markdown("""
 <style>
-[data-testid="stAppViewContainer"] { background-color: #0d1117 !important; }
+[data-testid="stAppViewContainer"] { background-color: #0b0e14 !important; }
 .main { padding: 0rem !important; }
 
 .block-container {
-    padding-top: 2.5rem !important; 
+    padding-top: 1.8rem !important; 
     padding-bottom: 1rem !important;
 }
 
+/* Header principal com degradê elegante */
 .header-box {
-    background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%) !important;
-    padding: 1rem; border-radius: 0 0 15px 15px; text-align: center;
-    margin-bottom: 25px !important;
-    box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
-    position: relative;
-    z-index: 99;
+    background: linear-gradient(135deg, #0e1726 0%, #0052d4 50%, #4364f7 100%) !important;
+    padding: 1.2rem;
+    border-radius: 12px;
+    text-align: center;
+    margin-bottom: 20px !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 82, 212, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
-.header-title { color: white !important; font-size: 26px !important; font-weight: 800 !important; margin:0; }
+.header-title { color: #ffffff !important; font-size: 24px !important; font-weight: 800 !important; margin:0; letter-spacing: 0.5px; }
 
+/* Cards KPIs */
 .card-kpi {
-    background: #161b22; border: 1px solid #30363d;
-    border-radius: 12px; padding: 15px; text-align: center;
-    border-bottom: 4px solid #00d2ff;
-    margin-top: 0px; 
+    background: #151c28;
+    border: 1px solid #1f293d;
+    border-radius: 10px;
+    padding: 12px 10px;
+    text-align: center;
+    height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: transform 0.2s ease;
 }
-.label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
-.value-kpi { color: #f0f6fc; font-size: 22px !important; font-weight: 900 !important; margin: 5px 0; letter-spacing: -1px; }
+.card-kpi:hover { border-color: #00d2ff; }
+
+.label-kpi { color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+.value-kpi { color: #f0f6fc; font-size: 20px !important; font-weight: 800 !important; margin: 2px 0; }
 .sub-kpi { color: #00d2ff; font-size: 11px; font-weight: 500; }
+
+/* Painel da Tabela de Status Executivo */
+.status-container {
+    background: #151c28;
+    border: 1px solid #1f293d;
+    border-radius: 10px;
+    padding: 12px 15px;
+    height: 100%;
+    min-height: 290px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+.status-title {
+    color: #f0f6fc;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #1f293d;
+    padding-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Custom Table CSS */
+.exec-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.exec-table th { color: #8b949e; text-align: center; padding: 6px 4px; font-weight: 600; border-bottom: 1px solid #2a364f; }
+.exec-table th:first-child { text-align: left; }
+.exec-table td { padding: 6px 4px; text-align: center; border-bottom: 1px solid #1c2638; color: #d0d7de; }
+.exec-table td:first-child { text-align: left; font-weight: 600; color: #f0f6fc; }
+
+.badge-inv { background: rgba(0, 210, 255, 0.15); color: #00d2ff; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+.badge-fim { color: #3fb950; font-weight: 700; }
+.badge-pen { color: #ff4b4b; font-weight: 700; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,7 +150,7 @@ try:
     if d_sel: df_filt = df_filt[df_filt['divisional'].isin(d_sel)]
 
     # --- UI PRINCIPAL ---
-    st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO INV PREVENÇAO DE PERDAS 2026</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="header-box"><p class="header-title">BI FECHAMENTO INV PREVENÇÃO DE PERDAS 2026</p></div>', unsafe_allow_html=True)
 
     # 3. NOVOS CÁLCULOS DOS TOTAIS
     perda_total = df_filt['v_perda_consol'].sum() 
@@ -118,11 +166,10 @@ try:
     perc_geral_perdas = (perda_total / vfat_total * 100) if vfat_total != 0 else 0
     perc_geral_str = f"{perc_geral_perdas:.3f}".replace('.', ',') + "%"
     
-    # CONTAGEM ÚNICA DE FILIAIS
     total_uds = df_filt['cd'].nunique()
     fechadas = df_filt[df_filt['is_fin']]['cd'].nunique()
 
-    # --- LÓGICA DE COMPARAÇÃO 2025 ---
+    # COMPARAÇÃO 2025
     dados_2025 = pd.DataFrame([
         {'tipo': 'CD', 'semestre': '1º semestre', 'valor': 9415271},
         {'tipo': 'CD', 'semestre': '2º semestre', 'valor': 5379088},
@@ -146,35 +193,41 @@ try:
     var_perc = ((perda_total_abs - perda_2025_abs) / abs(perda_2025_abs)) * 100 if perda_2025_abs != 0 else 0
 
     if var_perc < 0:
-        texto_var = f'<span style="color:#3fb950; font-weight:bold;">▼ {abs(var_perc):.1f}% (Redução)</span> vs 2025'
+        texto_var = f'<span style="color:#3fb950; font-weight:bold;">▼ {abs(var_perc):.1f}%</span> vs 2025'
     elif var_perc > 0:
-        texto_var = f'<span style="color:#ff4b4b; font-weight:bold;">▲ {var_perc:.1f}% (Aumento)</span> vs 2025'
+        texto_var = f'<span style="color:#ff4b4b; font-weight:bold;">▲ {var_perc:.1f}%</span> vs 2025'
     else:
         texto_var = "Igual a 2025"
 
-    # --- EXIBIÇÃO DOS CARDS ---
-    # 1. Damos um pouco mais de peso visual para a c7 (de 1.6 para 1.8)
-    c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1, 1, 1.8])
-    estilo_card = "height: 160px; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;"
+    # --- NOVO LAYOUT EXECUTIVO DO TOPO ---
+    col_kpis, col_status = st.columns([3.2, 1.8])
 
-    with c1: 
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Perda Consol.</div><div class="value-kpi">R$ {perda_total:,.0f}</div><div class="sub-kpi">{texto_var}</div></div></div>', unsafe_allow_html=True)
-    with c2: 
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Falta Volume</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">{abs(perc_falta):.1f}% da Perda</div></div></div>', unsafe_allow_html=True)
-    with c3: 
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Transporte</div><div class="value-kpi">R$ {vtransp:,.0f}</div><div class="sub-kpi">{abs(perc_transp):.1f}% da Perda</div></div></div>', unsafe_allow_html=True)
-    with c4: 
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">SAC</div><div class="value-kpi">R$ {vsac:,.0f}</div><div class="sub-kpi">{abs(perc_sac):.1f}% da Perda</div></div></div>', unsafe_allow_html=True)
-    with c5: 
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">% Geral Perdas</div><div class="value-kpi">{perc_geral_str}</div><div class="sub-kpi">Sobre Fat.</div></div></div>', unsafe_allow_html=True)
-    with c6: 
-        perc_fin = (fechadas / total_uds * 100) if total_uds > 0 else 0
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Total Filiais Únicas</div><div class="value-kpi">{total_uds}</div><div class="sub-kpi">{perc_fin:.1f}% Fin.</div></div></div>', unsafe_allow_html=True)
-    
-    with c7: 
+    with col_kpis:
+        # Linha 1 de KPIs (3 colunas)
+        k1, k2, k3 = st.columns(3)
+        with k1:
+            st.markdown(f'<div class="card-kpi"><div class="label-kpi">Perda Consol.</div><div class="value-kpi">R$ {perda_total:,.0f}</div><div class="sub-kpi">{texto_var}</div></div>', unsafe_allow_html=True)
+        with k2:
+            st.markdown(f'<div class="card-kpi"><div class="label-kpi">Falta Volume</div><div class="value-kpi">R$ {vfal:,.0f}</div><div class="sub-kpi">{abs(perc_falta):.1f}% da Perda</div></div>', unsafe_allow_html=True)
+        with k3:
+            st.markdown(f'<div class="card-kpi"><div class="label-kpi">Transporte</div><div class="value-kpi">R$ {vtransp:,.0f}</div><div class="sub-kpi">{abs(perc_transp):.1f}% da Perda</div></div>', unsafe_allow_html=True)
+
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+
+        # Linha 2 de KPIs (3 colunas)
+        k4, k5, k6 = st.columns(3)
+        with k4:
+            st.markdown(f'<div class="card-kpi"><div class="label-kpi">SAC</div><div class="value-kpi">R$ {vsac:,.0f}</div><div class="sub-kpi">{abs(perc_sac):.1f}% da Perda</div></div>', unsafe_allow_html=True)
+        with k5:
+            st.markdown(f'<div class="card-kpi"><div class="label-kpi">% Geral Perdas</div><div class="value-kpi">{perc_geral_str}</div><div class="sub-kpi">Sobre Faturamento</div></div>', unsafe_allow_html=True)
+        with k6:
+            perc_fin = (fechadas / total_uds * 100) if total_uds > 0 else 0
+            st.markdown(f'<div class="card-kpi"><div class="label-kpi">Filiais Únicas</div><div class="value-kpi">{total_uds}</div><div class="sub-kpi">{perc_fin:.1f}% Finalizados</div></div>', unsafe_allow_html=True)
+
+    with col_status:
+        # Tabela Executiva de Status ao Lado dos KPIs
         df_validos = df_filt[df_filt['tipo_clean'].str.strip() != ''].copy()
         
-        # Agrupa por Semestre e Tipo
         resumo_tipos = df_validos.groupby(['semestre_clean', 'tipo_clean']).agg(
             Tot=('cd', 'nunique'),
             Inv=('cd', 'count'),
@@ -186,11 +239,41 @@ try:
         linhas_html = ""
         for _, row in resumo_tipos.iterrows():
             sem_label = row['semestre_clean'].replace('semestre', 'Sem.').replace('º', 'º')
-            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:1px 1px; white-space:nowrap;'>{sem_label} | {row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center;'>{row['Tot']}</td><td style='color:#00d2ff; font-weight:bold; text-align:center;'>{row['Inv']}</td><td style='color:#3fb950; text-align:center;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center;'>{row['Pen']}</td></tr>"
+            linhas_html += f"""
+            <tr>
+                <td>{sem_label} | {row['tipo_clean']}</td>
+                <td>{row['Tot']}</td>
+                <td><span class="badge-inv">{row['Inv']}</span></td>
+                <td><span class="badge-fim">{row['Fim']}</span></td>
+                <td><span class="badge-pen">{row['Pen']}</span></td>
+            </tr>
+            """
             
-        tabela_html = f"<div style='max-height: 110px; overflow-y: auto; overflow-x: hidden; width: 100%;'><table style='width:100%; table-layout: fixed; font-size:8.5px; border-top:1px solid #30363d; margin-top:2px;'><colgroup><col style='width: 44%;'><col style='width: 14%;'><col style='width: 14%;'><col style='width: 14%;'><col style='width: 14%;'></colgroup><thead><tr style='color:#8b949e;'><th style='text-align:left; padding:1px 1px;'>Sem | Tipo</th><th>Tot</th><th style='color:#00d2ff;'>Inv</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table></div>"
-        
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi" style="margin-bottom:2px;">Status / Semestre</div>{tabela_html}</div></div>', unsafe_allow_html=True)
+        tabela_status = f"""
+        <div class="status-container">
+            <div class="status-title">
+                <span>📋 Status dos Inventários</span>
+                <span style="font-size:10px; color:#8b949e; font-weight:normal;">Visão por Semestre</span>
+            </div>
+            <div style="max-height: 220px; overflow-y: auto;">
+                <table class="exec-table">
+                    <thead>
+                        <tr>
+                            <th>Semestre / Tipo</th>
+                            <th>Filiais</th>
+                            <th>Qtd Inv</th>
+                            <th>Fim</th>
+                            <th>Pen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {linhas_html}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        """
+        st.markdown(tabela_status, unsafe_allow_html=True)
 
     # --- GRÁFICOS ---
     st.markdown("<br>", unsafe_allow_html=True)
