@@ -239,40 +239,10 @@ try:
         linhas_html = ""
         for _, row in resumo_tipos.iterrows():
             sem_label = row['semestre_clean'].replace('semestre', 'Sem.').replace('º', 'º')
-            linhas_html += f"""
-            <tr>
-                <td>{sem_label} | {row['tipo_clean']}</td>
-                <td>{row['Tot']}</td>
-                <td><span class="badge-inv">{row['Inv']}</span></td>
-                <td><span class="badge-fim">{row['Fim']}</span></td>
-                <td><span class="badge-pen">{row['Pen']}</span></td>
-            </tr>
-            """
+            linhas_html += f"<tr><td>{sem_label} | {row['tipo_clean']}</td><td>{row['Tot']}</td><td><span class='badge-inv'>{row['Inv']}</span></td><td><span class='badge-fim'>{row['Fim']}</span></td><td><span class='badge-pen'>{row['Pen']}</span></td></tr>"
             
-        tabela_status = f"""
-        <div class="status-container">
-            <div class="status-title">
-                <span>📋 Status dos Inventários</span>
-                <span style="font-size:10px; color:#8b949e; font-weight:normal;">Visão por Semestre</span>
-            </div>
-            <div style="max-height: 220px; overflow-y: auto;">
-                <table class="exec-table">
-                    <thead>
-                        <tr>
-                            <th>Semestre / Tipo</th>
-                            <th>Filiais</th>
-                            <th>Qtd Inv</th>
-                            <th>Fim</th>
-                            <th>Pen</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {linhas_html}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        """
+        tabela_status = f"""<div class="status-container"><div class="status-title"><span>📋 Status dos Inventários</span><span style="font-size:10px; color:#8b949e; font-weight:normal;">Visão por Semestre</span></div><div style="max-height: 220px; overflow-y: auto;"><table class="exec-table"><thead><tr><th>Semestre / Tipo</th><th>Filiais</th><th>Qtd Inv</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table></div></div>"""
+        
         st.markdown(tabela_status, unsafe_allow_html=True)
 
     # --- GRÁFICOS ---
