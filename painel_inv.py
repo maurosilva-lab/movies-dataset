@@ -153,7 +153,8 @@ try:
         texto_var = "Igual a 2025"
 
     # --- EXIBIÇÃO DOS CARDS ---
-    c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1, 1, 1.6])
+    # 1. Damos um pouco mais de peso visual para a c7 (de 1.6 para 1.8)
+    c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1, 1, 1.8])
     estilo_card = "height: 160px; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box;"
 
     with c1: 
@@ -173,10 +174,10 @@ try:
     with c7: 
         df_validos = df_filt[df_filt['tipo_clean'].str.strip() != ''].copy()
         
-        # Agrupa por Semestre e Tipo contando Unidades Únicas (Tot) e Qtd Total de Inventários (Inv)
+        # Agrupa por Semestre e Tipo
         resumo_tipos = df_validos.groupby(['semestre_clean', 'tipo_clean']).agg(
             Tot=('cd', 'nunique'),
-            Inv=('cd', 'count'), # Total de inventários executados/registrados no semestre
+            Inv=('cd', 'count'),
             Fim=('cd', lambda x: df_validos.loc[x.index][df_validos.loc[x.index]['is_fin']]['cd'].nunique())
         ).reset_index()
         
@@ -185,9 +186,9 @@ try:
         linhas_html = ""
         for _, row in resumo_tipos.iterrows():
             sem_label = row['semestre_clean'].replace('semestre', 'Sem.').replace('º', 'º')
-            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:1px 2px; white-space:nowrap;'>{sem_label} | {row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center;'>{row['Tot']}</td><td style='color:#00d2ff; font-weight:bold; text-align:center;'>{row['Inv']}</td><td style='color:#3fb950; text-align:center;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center;'>{row['Pen']}</td></tr>"
+            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:1px 1px; white-space:nowrap;'>{sem_label} | {row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center;'>{row['Tot']}</td><td style='color:#00d2ff; font-weight:bold; text-align:center;'>{row['Inv']}</td><td style='color:#3fb950; text-align:center;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center;'>{row['Pen']}</td></tr>"
             
-        tabela_html = f"<div style='max-height: 110px; overflow-y: auto; overflow-x: hidden;'><table style='width:100%; font-size:9px; border-top:1px solid #30363d; margin-top:2px;'><thead><tr style='color:#8b949e;'><th style='text-align:left; padding:1px 2px;'>Sem | Tipo</th><th>Tot</th><th style='color:#00d2ff;'>Inv</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table></div>"
+        tabela_html = f"<div style='max-height: 110px; overflow-y: auto; overflow-x: hidden; width: 100%;'><table style='width:100%; table-layout: fixed; font-size:8.5px; border-top:1px solid #30363d; margin-top:2px;'><colgroup><col style='width: 44%;'><col style='width: 14%;'><col style='width: 14%;'><col style='width: 14%;'><col style='width: 14%;'></colgroup><thead><tr style='color:#8b949e;'><th style='text-align:left; padding:1px 1px;'>Sem | Tipo</th><th>Tot</th><th style='color:#00d2ff;'>Inv</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table></div>"
         
         st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi" style="margin-bottom:2px;">Status / Semestre</div>{tabela_html}</div></div>', unsafe_allow_html=True)
 
