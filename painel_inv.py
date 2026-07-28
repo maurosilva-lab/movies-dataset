@@ -174,10 +174,9 @@ try:
         st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Total Filiais Únicas</div><div class="value-kpi">{total_uds}</div><div class="sub-kpi">{perc_fin:.1f}% Fin.</div></div></div>', unsafe_allow_html=True)
     
     with c7: 
-        # 💥 MONTAGEM DA TABELA DE STATUS COM SEMESTRE E SEM DUPLICAR UNIDADES 💥
         df_validos = df_filt[df_filt['tipo_clean'].str.strip() != ''].copy()
         
-        # Agrupa por Semestre + Tipo de forma única
+        # Agrupa por Semestre e Tipo contando unidades únicas
         resumo_tipos = df_validos.groupby(['semestre_clean', 'tipo_clean']).agg(
             Total=('cd', 'nunique'),
             Fim=('cd', lambda x: df_validos.loc[x.index][df_validos.loc[x.index]['is_fin']]['cd'].nunique())
@@ -188,11 +187,11 @@ try:
         linhas_html = ""
         for _, row in resumo_tipos.iterrows():
             sem_label = row['semestre_clean'].replace('semestre', 'Sem.').replace('º', 'º')
-            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:2px;'>{sem_label} | {row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center;'>{row['Total']}</td><td style='color:#3fb950; text-align:center;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center;'>{row['Pen']}</td></tr>"
+            linhas_html += f"<tr><td style='text-align:left; color:#8b949e; padding:1px 3px; white-space:nowrap;'>{sem_label} | {row['tipo_clean']}</td><td style='color:#f0f6fc; text-align:center;'>{row['Total']}</td><td style='color:#3fb950; text-align:center;'>{row['Fim']}</td><td style='color:#ff4b4b; text-align:center;'>{row['Pen']}</td></tr>"
             
-        tabela_html = f"<div style='max-height: 105px; overflow-y: auto;'><table style='width:100%; font-size:10px; border-top:1px solid #30363d; margin-top:2px;'><thead><tr style='color:#8b949e;'><th style='text-align:left;'>Sem | Tipo</th><th>Tot</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table></div>"
+        tabela_html = f"<div style='max-height: 110px; overflow-y: auto; overflow-x: hidden;'><table style='width:100%; font-size:9.5px; border-top:1px solid #30363d; margin-top:2px;'><thead><tr style='color:#8b949e;'><th style='text-align:left; padding:1px 3px;'>Sem | Tipo</th><th>Tot</th><th>Fim</th><th>Pen</th></tr></thead><tbody>{linhas_html}</tbody></table></div>"
         
-        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi">Status / Semestre</div>{tabela_html}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="card-kpi" style="{estilo_card}"><div style="width: 100%;"><div class="label-kpi" style="margin-bottom:2px;">Status / Semestre</div>{tabela_html}</div></div>', unsafe_allow_html=True)
 
     # --- GRÁFICOS ---
     st.markdown("<br>", unsafe_allow_html=True)
